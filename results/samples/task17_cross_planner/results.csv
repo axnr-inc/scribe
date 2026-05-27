@@ -1,0 +1,7 @@
+planner,run,correct,tool_calls,thinking_blocks,repl_timeouts,events,pred_final,gold,trace
+gpt-5,1,False,4,5,0,15,0.000000%,8.91,gpt5.jsonl
+gpt-5,2,True,7,8,1,24,8.907926%,8.91,gpt5_retry.jsonl
+gpt-5.5,1,True,6,7,0,21,8.907926%,8.91,gpt55.jsonl
+opus-4,1,False,7,5,0,21,7.683437,8.91,opus.jsonl
+opus-4,2,False,5,6,0,20,,8.91,opus_retry.jsonl
+opus-4,3,True,6,6,0,25,8.907926,8.91,opus_retry2.jsonl

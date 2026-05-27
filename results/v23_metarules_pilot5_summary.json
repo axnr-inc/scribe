@@ -1,0 +1,62 @@
+[
+  {
+    "task_id": "1712",
+    "wall_seconds": 182.308,
+    "cost_usd": 0.3274044,
+    "final_answer": "9.48",
+    "tool_calls": 22,
+    "ask_planner_calls": 0,
+    "thinking_blocks": 23,
+    "iter_count": 23,
+    "hit_iter_cap": false,
+    "error": null
+  },
+  {
+    "task_id": "2528",
+    "wall_seconds": 719.549,
+    "cost_usd": 0.5331231,
+    "final_answer": "-712.378864",
+    "tool_calls": 30,
+    "ask_planner_calls": 0,
+    "thinking_blocks": 31,
+    "iter_count": 31,
+    "hit_iter_cap": false,
+    "error": null
+  },
+  {
+    "task_id": "1444",
+    "wall_seconds": 7.42,
+    "cost_usd": 0.0220119,
+    "final_answer": "['E']",
+    "tool_calls": 1,
+    "ask_planner_calls": 0,
+    "thinking_blocks": 2,
+    "iter_count": 2,
+    "hit_iter_cap": false,
+    "error": null
+  },
+  {
+    "task_id": "1508",
+    "wall_seconds": 222.222,
+    "cost_usd": 0.24541050000000003,
+    "final_answer": "After evaluating the fee rules for each card scheme under the average baseline (50 EUR, account_type R, MCC 8000, generic wildcards), the highest fee is produced by **TransactPlus**.\n\nTransactPlus",
+    "tool_calls": 15,
+    "ask_planner_calls": 1,
+    "thinking_blocks": 16,
+    "iter_count": 16,
+    "hit_iter_cap": false,
+    "error": null
+  },
+  {
+    "task_id": "1574",
+    "wall_seconds": 61.996,
+    "cost_usd": 0.05751090000000001,
+    "final_answer": "27.250479",
+    "tool_calls": 7,
+    "ask_planner_calls": 0,
+    "thinking_blocks": 8,
+    "iter_count": 8,
+    "hit_iter_cap": false,
+    "error": null
+  }
+]

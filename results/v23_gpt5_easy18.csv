@@ -1,0 +1,19 @@
+task_id,correct,tool_calls,thinking_blocks,repl_timeouts,events,pred_final,gold,trace_path
+15,False,2,0,0,6,9.154306%,7.787407,results/v23_gpt5_easy18/15/sessions/normal_agent.jsonl
+16,True,3,0,0,8,Crossfit_Hanna,Crossfit_Hanna,results/v23_gpt5_easy18/16/sessions/normal_agent.jsonl
+17,True,4,0,0,11,8.907926%,8.91,results/v23_gpt5_easy18/17/sessions/normal_agent.jsonl
+18,True,18,0,0,38,TransactPlus,TransactPlus,results/v23_gpt5_easy18/18/sessions/normal_agent.jsonl
+19,True,4,0,0,10,9.676954%,9.676954,results/v23_gpt5_easy18/19/sessions/normal_agent.jsonl
+36,True,1,0,0,4,2.688013,2.688013,results/v23_gpt5_easy18/36/sessions/normal_agent.jsonl
+43,False,6,0,0,15,247.3,90.696,results/v23_gpt5_easy18/43/sessions/normal_agent.jsonl
+49,True,3,0,0,11,B. BE,B. BE,results/v23_gpt5_easy18/49/sessions/normal_agent.jsonl
+58,True,7,0,0,22,9.765683%,9.765683,results/v23_gpt5_easy18/58/sessions/normal_agent.jsonl
+59,True,6,0,0,14,"IT, ES, FR","IT,ES,FR",results/v23_gpt5_easy18/59/sessions/normal_agent.jsonl
+60,True,7,0,0,23,"Belles_cookbook_store, ES, SwiftCharge, Ecommerce","Belles_cookbook_store, ES, SwiftCharge, Ecommerce",results/v23_gpt5_easy18/60/sessions/normal_agent.jsonl
+61,True,3,0,0,11,Rafa_AI,Rafa_AI,results/v23_gpt5_easy18/61/sessions/normal_agent.jsonl
+65,True,0,0,0,2,intracountry,intracountry,results/v23_gpt5_easy18/65/sessions/normal_agent.jsonl
+67,False,0,0,0,2,"capture_delay, intracountry, monthly_volume","monthly_volume, capture_delay",results/v23_gpt5_easy18/67/sessions/normal_agent.jsonl
+68,False,0,0,0,2,"monthly_fraud_level, is_credit, eur_amount",monthly_fraud_level,results/v23_gpt5_easy18/68/sessions/normal_agent.jsonl
+69,False,0,0,0,2,Not Applicable,>5m,results/v23_gpt5_easy18/69/sessions/normal_agent.jsonl
+70,True,10,0,0,32,Not Applicable,Not Applicable,results/v23_gpt5_easy18/70/sessions/normal_agent.jsonl
+71,True,4,0,0,14,Not Applicable,Not Applicable,results/v23_gpt5_easy18/71/sessions/normal_agent.jsonl

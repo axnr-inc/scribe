@@ -1,0 +1,62 @@
+[
+  {
+    "task_id": "36",
+    "wall_seconds": 57.464,
+    "cost_usd": 0.0610458,
+    "final_answer": "2.688013",
+    "tool_calls": 3,
+    "ask_planner_calls": 0,
+    "thinking_blocks": 3,
+    "iter_count": 4,
+    "hit_iter_cap": false,
+    "error": null
+  },
+  {
+    "task_id": "17",
+    "wall_seconds": 66.397,
+    "cost_usd": 0.079104,
+    "final_answer": "7.683437%",
+    "tool_calls": 4,
+    "ask_planner_calls": 0,
+    "thinking_blocks": 3,
+    "iter_count": 5,
+    "hit_iter_cap": false,
+    "error": null
+  },
+  {
+    "task_id": "1453",
+    "wall_seconds": 178.936,
+    "cost_usd": 0.29788139999999996,
+    "final_answer": "Not Applicable",
+    "tool_calls": 5,
+    "ask_planner_calls": 0,
+    "thinking_blocks": 5,
+    "iter_count": 6,
+    "hit_iter_cap": false,
+    "error": null
+  },
+  {
+    "task_id": "1739",
+    "wall_seconds": 547.721,
+    "cost_usd": 0.844011,
+    "final_answer": "30.99",
+    "tool_calls": 13,
+    "ask_planner_calls": 0,
+    "thinking_blocks": 11,
+    "iter_count": 14,
+    "hit_iter_cap": false,
+    "error": null
+  },
+  {
+    "task_id": "1275",
+    "wall_seconds": 365.576,
+    "cost_usd": 0.5597975999999999,
+    "final_answer": "0.131000",
+    "tool_calls": 13,
+    "ask_planner_calls": 0,
+    "thinking_blocks": 10,
+    "iter_count": 14,
+    "hit_iter_cap": false,
+    "error": null
+  }
+]

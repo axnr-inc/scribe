@@ -1,0 +1,62 @@
+[
+  {
+    "task_id": "1712",
+    "wall_seconds": 1329.231,
+    "cost_usd": 2.9606373,
+    "final_answer": "Not Applicable",
+    "tool_calls": 31,
+    "ask_planner_calls": 1,
+    "thinking_blocks": 32,
+    "iter_count": 32,
+    "hit_iter_cap": false,
+    "error": null
+  },
+  {
+    "task_id": "2528",
+    "wall_seconds": 284.552,
+    "cost_usd": 0.40845240000000005,
+    "final_answer": "The fee delta for Belles_cookbook_store if its MCC had been 8062 for all of 2023 is:\n\n-712.378864",
+    "tool_calls": 24,
+    "ask_planner_calls": 1,
+    "thinking_blocks": 25,
+    "iter_count": 25,
+    "hit_iter_cap": false,
+    "error": null
+  },
+  {
+    "task_id": "1444",
+    "wall_seconds": 87.697,
+    "cost_usd": 0.1306749,
+    "final_answer": "The generic, fully-unconstrained NexPay credit fee rule set collapses to a single record (ID 384) with `aci = ['C', 'B']`, `fixed_amount = 0.05` and `rate = 14`.  \nFor a €1 transaction the fee is:\n\n\\[\n0.05 + 14 \\times \\frac{1}{10000} = 0.0514\n\\]\n\nBoth ACI **B** and ACI **C** map to this maximum fee. Alphabetically, **B** comes before **C**, so it wins the tie‑break.\n\n[\"B\"]",
+    "tool_calls": 10,
+    "ask_planner_calls": 0,
+    "thinking_blocks": 11,
+    "iter_count": 11,
+    "hit_iter_cap": false,
+    "error": null
+  },
+  {
+    "task_id": "1508",
+    "wall_seconds": 158.385,
+    "cost_usd": 0.300441,
+    "final_answer": "TransactPlus",
+    "tool_calls": 15,
+    "ask_planner_calls": 0,
+    "thinking_blocks": 16,
+    "iter_count": 16,
+    "hit_iter_cap": false,
+    "error": null
+  },
+  {
+    "task_id": "1574",
+    "wall_seconds": 91.82,
+    "cost_usd": 0.1528329,
+    "final_answer": "27.250479",
+    "tool_calls": 13,
+    "ask_planner_calls": 0,
+    "thinking_blocks": 14,
+    "iter_count": 14,
+    "hit_iter_cap": false,
+    "error": null
+  }
+]

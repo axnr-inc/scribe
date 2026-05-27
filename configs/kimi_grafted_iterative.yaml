@@ -1,0 +1,31 @@
+model:
+  provider: openrouter
+  model: moonshotai/kimi-k2.6
+  thinking: "high"
+  prompt_caching: false
+  temperature: null
+  top_p: null
+  max_tokens: null
+
+prompt_version: dabstep_grafted_iterative
+
+# The planner the executor will escalate to via the `ask_planner` tool.
+# Only active when the harness is launched with `--specs <dir>`.
+planner:
+  provider: anthropic
+  model: claude-sonnet-4-6
+
+execution:
+  mode: quick
+  max_iterations: 40
+  tool_execution: sequential
+  rate_limit_retries: 5
+  overloaded_retries: 10
+
+connection:
+  dialect: local
+  dataset: ""
+  project_id: ""
+  credential_path: ""
+  context_dir: ""
+  python_bin: python3

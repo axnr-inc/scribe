@@ -1,0 +1,20 @@
+SCRIBE — Spec-Conditioned ReAct with Inline Backreview Escalation
+Copyright 2026 SCRIBE Authors.
+
+This product includes software developed by third parties:
+
+* DABStep benchmark, scorer, and reference data — Adyen / Hugging Face,
+  Apache 2.0 licensed. The official scorer (scorer.py) is vendored under
+  vendor/dabstep_scorer/ with attribution. DABStep data files (payments.csv,
+  fees.json, manual.md, merchant_data.json, etc.) are NOT redistributed in
+  this repo; users download them on demand via scripts/fetch_dabstep_data.py
+  from the official Hugging Face dataset (adyen/DABstep).
+  https://huggingface.co/datasets/adyen/DABstep
+
+* pi-ai library (@mariozechner/pi-ai) — provides the TypeScript LLM client
+  abstraction the executor uses. See node_modules/@mariozechner/pi-ai for
+  its license after install.
+
+References in the paper to prior architectures (ReAct, Reflexion, AutoGen,
+DS-STAR, etc.) cite the original authors; no source code from those projects
+is included.

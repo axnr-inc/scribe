@@ -1,0 +1,64 @@
+name: dabstep_grafted_iterative_dk
+description: Variant-B executor — DK helpers imported from data/context/dabstep_helper.py rather than inlined in the preamble. Slim system prompt; helpers available by name in run_python.
+
+tools_section: |
+  # Tools available
+
+  ## run_python(code)
+  Persistent Python session. Preamble has loaded:
+  - `CONTEXT_DIR` (absolute path to data directory)
+  - `context_path(*parts)` — helper to join paths under `CONTEXT_DIR`
+  - Libraries: `pd`, `np`, `json`, `csv`, `os`
+  - **Canonical helpers (already imported)**: `list_match`, `scal_match`,
+    `attr_matches_wildcard`, `rule_applies(rule, txn, merchant=None)`, `fee_for_rule`.
+    Source at `data/context/dabstep_helper.py`. Call these by name; do not redefine.
+
+  ## ask_spec_agent(summary_and_question)
+  Call when you have a real uncertainty: filter/formula doubt, edge case the spec
+  doesn't cover, mismatch between intermediate result and what you expected, or
+  uncertainty about a metric definition / tie-break. Before committing
+  'Not Applicable', escalate to verify.
+
+  Send a STRUCTURED SUMMARY using these headers verbatim:
+
+      # Step
+      # Computed so far
+      # Pseudo-code
+      # Assumptions
+      # Question
+
+  The spec agent reads source docs and either flags a mistake (with a revised spec)
+  or answers with doc quotes.
+
+  # Workflow
+  1. Read the spec; identify steps and any ambiguity.
+  2. For each step: implement using the canonical helpers; verify intermediate results.
+  3. If uncertain, ask_spec_agent BEFORE committing.
+  4. Print final answer on its OWN LINE as the LAST line, in the exact
+     `expected_output_format` from the spec.
+
+quick_rules: |
+  - Match the format EXACTLY (spec's `expected_output_format` is authoritative).
+  - Use `rule_applies(rule, txn, merchant)` for rule-matching; do not redefine.
+  - If a result looks wrong, ask_spec_agent with a structured summary.
+  - If matching produces zero results AND that matches task intent, print 'Not Applicable'.
+  - Final answer on its OWN LINE as the LAST line. No trailing prose.
+
+deep_rules: |
+  - Verify intermediate results against the data before proceeding.
+  - When in doubt, ask_spec_agent — escalation is cheap; a wrong commit is costly.
+  - Before submitting 'Not Applicable', verify with the spec agent.
+  - Print final answer in the exact format specified.
+
+preamble_extras: |
+
+  # Variant-B: load canonical DABStep helpers (source: data/context/dabstep_helper.py)
+  import sys as _sys
+  _sys.path.insert(0, CONTEXT_DIR)
+  from dabstep_helper import (
+      list_match,
+      scal_match,
+      attr_matches_wildcard,
+      rule_applies,
+      fee_for_rule,
+  )

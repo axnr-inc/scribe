@@ -1,0 +1,23 @@
+{
+  "started_at": "2026-05-26T07:12:13.719Z",
+  "dataset": "/Users/suraj/Downloads/scribe/results/repro_pilot/tasks.jsonl",
+  "config": "/Users/suraj/Downloads/scribe/configs/scribe_main.yaml",
+  "model": {
+    "provider": "fireworks",
+    "model": "accounts/fireworks/models/kimi-k2p6",
+    "thinking": null,
+    "prompt_caching": false,
+    "temperature": null,
+    "top_p": null,
+    "max_tokens": null
+  },
+  "planner": {
+    "provider": "openrouter",
+    "model": "openai/gpt-5"
+  },
+  "specs_dir": "/Users/suraj/Downloads/scribe/results/repro_pilot/specs",
+  "prompt_version": "dabstep_grafted_iterative",
+  "max_iterations": 40,
+  "notes": "repro_pilot",
+  "task_count": 5
+}

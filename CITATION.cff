@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+title: "SCRIBE — Spec-Conditioned ReAct with Inline Backreview Escalation"
+message: "If you use this software, please cite the accompanying paper."
+authors:
+  - family-names: "TBD"
+    given-names: "TBD"
+abstract: >
+  SCRIBE is a three-role agent architecture (Spec Agent, ReAct Executor,
+  Review Agent) with asymmetric model assignment (frontier model for
+  spec/review, smaller open-weights model for the heavy executor), evaluated
+  on the DABStep data-analysis benchmark.
+keywords:
+  - large language models
+  - agent architecture
+  - data analysis
+  - DABStep
+  - role specialization
+license: Apache-2.0
+repository: "TBD"
+preferred-citation:
+  type: conference-paper
+  title: "SCRIBE: Spec-Conditioned ReAct for Data-Analysis Agents"
+  authors:
+    - family-names: "TBD"
+      given-names: "TBD"
+  year: 2026
+  conference:
+    name: "IEEE International Conference on Data Mining (ICDM)"

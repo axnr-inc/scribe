@@ -1,0 +1,50 @@
+[
+  {
+    "task_id": "2366",
+    "wall_seconds": 349.097,
+    "cost_usd": 0.8682021,
+    "final_answer": "2.67727200000000",
+    "tool_calls": 37,
+    "ask_planner_calls": 1,
+    "thinking_blocks": 38,
+    "iter_count": 38,
+    "hit_iter_cap": false,
+    "error": null
+  },
+  {
+    "task_id": "2740",
+    "wall_seconds": 637.125,
+    "cost_usd": 1.0029822,
+    "final_answer": "",
+    "tool_calls": 40,
+    "ask_planner_calls": 1,
+    "thinking_blocks": 40,
+    "iter_count": 41,
+    "hit_iter_cap": true,
+    "error": null
+  },
+  {
+    "task_id": "1456",
+    "wall_seconds": 265.994,
+    "cost_usd": 0.3366462,
+    "final_answer": "['E']",
+    "tool_calls": 23,
+    "ask_planner_calls": 1,
+    "thinking_blocks": 24,
+    "iter_count": 24,
+    "hit_iter_cap": false,
+    "error": null
+  },
+  {
+    "task_id": "1834",
+    "wall_seconds": 398.634,
+    "cost_usd": 0.5572677,
+    "final_answer": "",
+    "tool_calls": 40,
+    "ask_planner_calls": 0,
+    "thinking_blocks": 40,
+    "iter_count": 41,
+    "hit_iter_cap": true,
+    "error": null
+  }
+]

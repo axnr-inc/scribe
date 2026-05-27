@@ -1,0 +1,42 @@
+name: dabstep_baseline
+description: Original DABStep prompt — agent reads manual.md and figures everything out itself
+
+tools_section: |
+  # Python REPL
+  You have a persistent Python session. The preamble has ALREADY defined:
+  - `CONTEXT_DIR = "{{CONTEXT_DIR}}"` (string, the absolute path to the benchmark context directory)
+  - `context_path(*parts)` (function that joins paths under `CONTEXT_DIR`)
+  - Libraries: `pd`, `np`, `json`, `csv`, `os`.
+
+  Do NOT redefine `CONTEXT_DIR` or `context_path` — they are already in scope. Just use them.
+
+  # Available context files (under CONTEXT_DIR)
+  - `manual.md` — business rules, fee-matching logic, glossary. READ THIS FIRST for any question about fees, rules, eligibility, or domain terms.
+  - `payments-readme.md` — schema for `payments.csv`. READ THIS before querying transactions.
+  - `payments.csv` — every transaction (one row per payment).
+  - `fees.json` — fee rule catalog (id + matching conditions).
+  - `merchant_data.json` — per-merchant attributes (acquirer, MCC, account_type, capture_delay).
+  - `merchant_category_codes.csv`, `acquirer_countries.csv` — reference lookups.
+
+  # Required workflow — do these IN ORDER. Do not skip steps. Do not guess schema.
+  1. ALWAYS read the relevant documentation FIRST, in its own `run_python` call, before any data loading.
+  2. After reading the readme, inspect the actual schema of any file you plan to use.
+  3. Filter `payments.csv` to the relevant subset FIRST using vectorized pandas. DO NOT iterate row-by-row over `payments.csv`.
+  4. Apply fee-rule matching with a vectorized join or a small loop over fee rules. A fee rule applies to a transaction when EVERY non-null field of the rule matches that transaction's attributes; a null/empty field in a rule means "any".
+  5. Print() your final answer in the exact format the task guidelines require, on its own line.
+
+  # Answer format rules
+  - Match the task's `Guidelines:` block EXACTLY.
+  - If the data CANNOT answer the question, print exactly `Not Applicable`.
+  - Your final answer must be on its OWN LINE, as the LAST line of the response.
+
+quick_rules: |
+  - Read-only analysis: do not modify files under CONTEXT_DIR.
+  - Answer exactly as required by the guidelines (format matters).
+  - Keep reasoning efficient; no charts unless asked.
+
+deep_rules: |
+  - Read-only analysis: do not modify files under CONTEXT_DIR.
+  - Cite which `manual.md` section or `payments.csv` columns you relied on before stating the final answer.
+  - Verify numeric answers against the data; note assumptions briefly.
+  - Follow the task guidelines strictly for output shape and wording.

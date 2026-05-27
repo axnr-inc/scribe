@@ -1,0 +1,32 @@
+model:
+  provider: fireworks
+  model: accounts/fireworks/models/kimi-k2p6
+  thinking: null
+  prompt_caching: false
+  temperature: null
+  top_p: null
+  max_tokens: null
+
+# Variant-B prompt — same as dabstep_grafted_iterative, with canonical DK helpers
+# (list_match, scal_match, rule_applies, attr_matches_wildcard, fee_for_rule)
+# injected via preamble_extras. See src/prompts/dabstep_grafted_iterative_dk.yaml.
+prompt_version: dabstep_grafted_iterative_dk
+
+planner:
+  provider: openrouter
+  model: openai/gpt-5
+
+execution:
+  mode: quick
+  max_iterations: 50
+  tool_execution: sequential
+  rate_limit_retries: 5
+  overloaded_retries: 10
+
+connection:
+  dialect: local
+  dataset: ""
+  project_id: ""
+  credential_path: ""
+  context_dir: ""
+  python_bin: python3

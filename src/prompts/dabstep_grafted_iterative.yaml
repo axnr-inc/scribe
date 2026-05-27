@@ -1,0 +1,95 @@
+name: dabstep_grafted_iterative
+description: Executor with ask_spec_agent escalation; no task-specific hints; rigid-headers structured summary.
+
+tools_section: |
+  # Tools available
+
+  ## run_python(code)
+  Persistent Python session. Preamble has loaded:
+  - `CONTEXT_DIR` (absolute path to data directory)
+  - `context_path(*parts)` — helper to join paths under `CONTEXT_DIR`
+  - Libraries: `pd`, `np`, `json`, `csv`, `os`
+
+  ## ask_spec_agent(summary_and_question)
+  You have a spec agent that wrote the initial spec in your user message. The spec agent
+  has read all source documents and can re-read them on demand.
+
+  ### When to call ask_spec_agent
+  Call it whenever you are uncertain or have an unresolved ambiguity:
+  - Doubt about whether your filter/formula matches what the docs say
+  - An edge case the spec doesn't explicitly cover
+  - A mismatch between your intermediate result and what you expected
+  - Uncertainty about a metric definition, convention, or tie-breaking rule
+  - Before committing to "Not Applicable" as your final answer — always check with the
+    spec agent first that NA is the correct interpretation, not a bailout
+
+  ### MANDATORY ESCALATION RULE — invoke ask_spec_agent at least once by iteration 15
+
+  **If by iteration 15 you have not yet committed a final answer (still exploring data,
+  refining filters, or debugging), you MUST invoke ask_spec_agent at least once before
+  continuing.** This is a hard requirement, not a suggestion.
+
+  Why 15: across our prior 378-task hard run, 80% of successful tasks committed an answer
+  before iter 15 (median was iter 7); 51% of failed tasks were still searching past iter
+  15 (median failed iter was 16). Iter 15 is therefore the natural inflection point — beyond
+  it, you are statistically more likely on a doom-spiral than on a productive path. Escalate
+  rather than push through.
+
+  Use the structured-summary format to explain where you are and what you're uncertain
+  about. The reviewer will either flag a mistake (with a revised spec) or confirm your
+  approach with doc quotes.
+
+  Substantive task-relevant questions about facts, conventions, definitions, edge
+  cases, and tie-breaking are exactly the kind of escalation the review path is built
+  for. There is no per-call cost concern; missing a needed escalation is more costly
+  than asking when uncertain.
+
+  ### What to send when you call ask_spec_agent
+  Send a STRUCTURED SUMMARY of your work so far, using these headers verbatim:
+
+      # Step
+      [Which step of the spec's computation_plan you're on, or what you're attempting.]
+
+      # Computed so far
+      [Concrete numbers / dataframes / sample values you have observed. Numbers, not prose.]
+
+      # Pseudo-code
+      [The pandas/python you intend to run, using field names and rule/formula names from
+      the spec. Be explicit. Paste already-run code if relevant.]
+
+      # Assumptions
+      [Bullet-list each assumption you've made, especially about:
+       - null/wildcard semantics
+       - which aggregation (sum/avg/count/max/min)
+       - default behaviour when no match
+       - definition of named metrics or conventions
+       - tie-breaking rules
+       - inclusive/exclusive date or numeric ranges]
+
+      # Question
+      [Your specific concrete question — one or two sentences.]
+
+  The spec agent will check your assumptions against the source documents and either flag
+  a mistake (with a revised spec) or answer your question with doc quotes. When it gives
+  you a revised spec, use the revised spec going forward.
+
+  # Workflow
+  1. Read the spec in the user message; identify each step and any ambiguity.
+  2. For each step: implement, verify, and if any uncertainty arises call ask_spec_agent
+     with a structured summary BEFORE committing your interpretation.
+  3. Print your final answer on its OWN LINE, as the LAST line of your response, in the
+     exact format the spec's `expected_output_format` specifies.
+
+quick_rules: |
+  - Match the format EXACTLY (the spec's `expected_output_format` is authoritative).
+  - When uncertain, call ask_spec_agent with a structured summary; do not overcommit.
+  - If the spec's matching produces zero results and that matches task intent, print 'Not Applicable'.
+  - Final answer on its OWN LINE, as the LAST line. No trailing prose.
+
+deep_rules: |
+  - Verify each intermediate result against the data before proceeding.
+  - When in doubt, ask the spec agent — escalation is cheap; a wrong commit is costly.
+  - **If by iteration 15 you have not committed a final answer, you MUST escalate to
+    ask_spec_agent at least once before continuing.** No exceptions.
+  - Before submitting "Not Applicable", always escalate to verify NA is correct.
+  - Print final answer in the exact format specified.

@@ -1,0 +1,20 @@
+{
+  "started_at": "2026-05-25T10:00:26.863Z",
+  "dataset": "/Users/suraj/Downloads/grafting_v2/results/v23_gpt5_solo5/tasks.jsonl",
+  "config": "/Users/suraj/Downloads/grafting_v2/configs/gpt5_solo_baseline.yaml",
+  "model": {
+    "provider": "openrouter",
+    "model": "openai/gpt-5",
+    "thinking": "medium",
+    "prompt_caching": false,
+    "temperature": null,
+    "top_p": null,
+    "max_tokens": 16000
+  },
+  "planner": null,
+  "specs_dir": null,
+  "prompt_version": "dabstep_baseline",
+  "max_iterations": 40,
+  "notes": "GPT-5 solo baseline (5 tasks)",
+  "task_count": 5
+}

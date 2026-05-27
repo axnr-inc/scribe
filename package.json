@@ -1,0 +1,28 @@
+{
+  "name": "scribe",
+  "version": "0.1.0",
+  "description": "SCRIBE — Spec-Conditioned ReAct with Inline Backreview Escalation. Three-role agent architecture for DABStep.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "postinstall": "node scripts/patch_pi_ai_env.cjs",
+    "run": "tsx src/run.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mariozechner/pi-agent-core": "^0.62.0",
+    "@mariozechner/pi-ai": "^0.62.0",
+    "@sinclair/typebox": "^0.34.49",
+    "commander": "^13.1.0",
+    "dotenv": "^17.3.1",
+    "js-yaml": "^4.1.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.15.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.8.3"
+  }
+}

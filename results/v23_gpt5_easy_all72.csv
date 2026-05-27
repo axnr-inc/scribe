@@ -1,0 +1,73 @@
+task_id,correct,tool_calls,thinking_blocks,repl_timeouts,events,pred_final,gold,trace_path
+1,True,5,0,0,15,138236,138236,results/v23_gpt5_easy_all72/1/sessions/normal_agent.jsonl
+10,True,4,0,0,13,5,5,results/v23_gpt5_easy_all72/10/sessions/normal_agent.jsonl
+11,True,1,0,0,5,4811.76,4811.76,results/v23_gpt5_easy_all72/11/sessions/normal_agent.jsonl
+12,True,8,0,0,25,GlobalCard,GlobalCard,results/v23_gpt5_easy_all72/12/sessions/normal_agent.jsonl
+13,True,5,0,0,14,14,14,results/v23_gpt5_easy_all72/13/sessions/normal_agent.jsonl
+14,False,0,0,0,1,,has_fraudulent_dispute,results/v23_gpt5_easy_all72/14/sessions/normal_agent.jsonl
+15,False,0,0,0,1,,7.787407,results/v23_gpt5_easy_all72/15/sessions/normal_agent.jsonl
+16,False,4,0,0,10,,Crossfit_Hanna,results/v23_gpt5_easy_all72/16/sessions/normal_agent.jsonl
+17,True,4,0,0,10,8.907926%,8.91,results/v23_gpt5_easy_all72/17/sessions/normal_agent.jsonl
+18,False,0,0,0,1,,TransactPlus,results/v23_gpt5_easy_all72/18/sessions/normal_agent.jsonl
+19,True,3,0,0,10,9.676954,9.676954,results/v23_gpt5_easy_all72/19/sessions/normal_agent.jsonl
+2,False,0,0,0,1,,91.852,results/v23_gpt5_easy_all72/2/sessions/normal_agent.jsonl
+20,True,2,0,0,7,Crossfit_Hanna,Crossfit_Hanna,results/v23_gpt5_easy_all72/20/sessions/normal_agent.jsonl
+21,False,0,0,0,1,,Crossfit_Hanna,results/v23_gpt5_easy_all72/21/sessions/normal_agent.jsonl
+22,True,1,0,0,4,no,no,results/v23_gpt5_easy_all72/22/sessions/normal_agent.jsonl
+23,True,4,0,0,12,0.0,0.0,results/v23_gpt5_easy_all72/23/sessions/normal_agent.jsonl
+24,True,2,0,0,7,Other,Other,results/v23_gpt5_easy_all72/24/sessions/normal_agent.jsonl
+25,True,1,0,0,5,2429,2429,results/v23_gpt5_easy_all72/25/sessions/normal_agent.jsonl
+26,True,6,0,0,14,Crossfit_Hanna,Crossfit_Hanna,results/v23_gpt5_easy_all72/26/sessions/normal_agent.jsonl
+27,True,5,0,0,13,13,13,results/v23_gpt5_easy_all72/27/sessions/normal_agent.jsonl
+28,True,2,0,0,6,11.486208,11.486208,results/v23_gpt5_easy_all72/28/sessions/normal_agent.jsonl
+29,True,6,0,0,14,yes,yes,results/v23_gpt5_easy_all72/29/sessions/normal_agent.jsonl
+3,True,1,0,0,4,27647,27647,results/v23_gpt5_easy_all72/3/sessions/normal_agent.jsonl
+30,True,2,0,0,8,Yes,yes,results/v23_gpt5_easy_all72/30/sessions/normal_agent.jsonl
+31,True,6,0,0,20,C. both ip_address and email_address,C. both ip_address and email_address,results/v23_gpt5_easy_all72/31/sessions/normal_agent.jsonl
+32,True,2,0,0,6,1.429,1.429,results/v23_gpt5_easy_all72/32/sessions/normal_agent.jsonl
+33,True,1,0,0,4,46284,46284,results/v23_gpt5_easy_all72/33/sessions/normal_agent.jsonl
+34,True,3,0,0,10,55192,55192,results/v23_gpt5_easy_all72/34/sessions/normal_agent.jsonl
+35,False,0,0,0,1,,28629,results/v23_gpt5_easy_all72/35/sessions/normal_agent.jsonl
+36,True,2,0,0,8,2.688013,2.688013,results/v23_gpt5_easy_all72/36/sessions/normal_agent.jsonl
+37,True,5,0,0,14,2.724331,2.724331,results/v23_gpt5_easy_all72/37/sessions/normal_agent.jsonl
+38,True,3,0,0,10,59.960502,59.960502,results/v23_gpt5_easy_all72/38/sessions/normal_agent.jsonl
+39,False,0,0,0,1,,24.999277,results/v23_gpt5_easy_all72/39/sessions/normal_agent.jsonl
+4,False,0,0,0,1,,NL,results/v23_gpt5_easy_all72/4/sessions/normal_agent.jsonl
+40,True,2,0,0,6,9.999566,9.999566,results/v23_gpt5_easy_all72/40/sessions/normal_agent.jsonl
+41,False,0,0,0,1,,ip_address,results/v23_gpt5_easy_all72/41/sessions/normal_agent.jsonl
+42,True,2,0,0,6,no,no,results/v23_gpt5_easy_all72/42/sessions/normal_agent.jsonl
+43,False,6,0,0,14,247.300,90.696,results/v23_gpt5_easy_all72/43/sessions/normal_agent.jsonl
+44,True,2,0,0,6,61.855069,61.855069,results/v23_gpt5_easy_all72/44/sessions/normal_agent.jsonl
+45,True,3,0,0,10,GlobalCard,GlobalCard,results/v23_gpt5_easy_all72/45/sessions/normal_agent.jsonl
+46,True,6,0,0,14,1.544,1.544,results/v23_gpt5_easy_all72/46/sessions/normal_agent.jsonl
+47,False,6,0,0,20,59.604,78.044,results/v23_gpt5_easy_all72/47/sessions/normal_agent.jsonl
+48,False,0,0,0,1,,no,results/v23_gpt5_easy_all72/48/sessions/normal_agent.jsonl
+49,True,2,0,0,7,B. BE,B. BE,results/v23_gpt5_easy_all72/49/sessions/normal_agent.jsonl
+5,True,2,0,0,7,NL,NL,results/v23_gpt5_easy_all72/5/sessions/normal_agent.jsonl
+50,True,2,0,0,8,yes,yes,results/v23_gpt5_easy_all72/50/sessions/normal_agent.jsonl
+51,False,0,0,0,1,,41679,results/v23_gpt5_easy_all72/51/sessions/normal_agent.jsonl
+52,True,6,0,0,20,NL,NL,results/v23_gpt5_easy_all72/52/sessions/normal_agent.jsonl
+53,False,0,0,0,1,,10765,results/v23_gpt5_easy_all72/53/sessions/normal_agent.jsonl
+54,True,6,0,0,18,Crossfit_Hanna,Crossfit_Hanna,results/v23_gpt5_easy_all72/54/sessions/normal_agent.jsonl
+55,True,2,0,0,8,Other,Other,results/v23_gpt5_easy_all72/55/sessions/normal_agent.jsonl
+56,True,1,0,0,4,22520,22520,results/v23_gpt5_easy_all72/56/sessions/normal_agent.jsonl
+57,True,1,0,0,4,55192,55192,results/v23_gpt5_easy_all72/57/sessions/normal_agent.jsonl
+58,True,2,0,0,8,9.765683%,9.765683,results/v23_gpt5_easy_all72/58/sessions/normal_agent.jsonl
+59,True,2,0,0,7,"IT,ES,FR","IT,ES,FR",results/v23_gpt5_easy_all72/59/sessions/normal_agent.jsonl
+6,True,4,0,0,10,73.150,73.150,results/v23_gpt5_easy_all72/6/sessions/normal_agent.jsonl
+60,True,9,0,0,20,"Belles_cookbook_store, ES, SwiftCharge, Ecommerce","Belles_cookbook_store, ES, SwiftCharge, Ecommerce",results/v23_gpt5_easy_all72/60/sessions/normal_agent.jsonl
+61,True,6,0,0,14,Rafa_AI,Rafa_AI,results/v23_gpt5_easy_all72/61/sessions/normal_agent.jsonl
+62,True,5,0,0,16,Not Applicable,Not Applicable,results/v23_gpt5_easy_all72/62/sessions/normal_agent.jsonl
+63,True,2,0,0,8,"R, D, H, F, S, O","R, D, H, F, S, O",results/v23_gpt5_easy_all72/63/sessions/normal_agent.jsonl
+64,True,0,0,0,2,"A, B, C, D, E, F, G","A, B, C, D, E, F, G",results/v23_gpt5_easy_all72/64/sessions/normal_agent.jsonl
+65,False,0,0,0,1,,intracountry,results/v23_gpt5_easy_all72/65/sessions/normal_agent.jsonl
+66,False,0,0,0,1,,is_credit,results/v23_gpt5_easy_all72/66/sessions/normal_agent.jsonl
+67,False,0,0,0,2,of ( win我和 J project serious落入 each good. use not to刘 uses risk Mich the to start I with引 many to start收 widely年 在 old学和4  on of 退出包 drive电话 research market,"monthly_volume, capture_delay",results/v23_gpt5_easy_all72/67/sessions/normal_agent.jsonl
+68,False,0,0,0,2,"monthly_fraud_level, is_credit, eur_amount",monthly_fraud_level,results/v23_gpt5_easy_all72/68/sessions/normal_agent.jsonl
+69,True,2,0,0,8,5m,>5m,results/v23_gpt5_easy_all72/69/sessions/normal_agent.jsonl
+7,False,0,0,0,1,,89.999711,results/v23_gpt5_easy_all72/7/sessions/normal_agent.jsonl
+70,False,4,0,0,10,yes,Not Applicable,results/v23_gpt5_easy_all72/70/sessions/normal_agent.jsonl
+71,False,0,0,0,1,,Not Applicable,results/v23_gpt5_easy_all72/71/sessions/normal_agent.jsonl
+72,True,2,0,0,6,"Belles_cookbook_store, Crossfit_Hanna, Golfclub_Baron_Friso, Martinis_Fine_Steakhouse, Rafa_AI","Belles_cookbook_store, Crossfit_Hanna, Golfclub_Baron_Friso, Martinis_Fine_Steakhouse, Rafa_AI",results/v23_gpt5_easy_all72/72/sessions/normal_agent.jsonl
+8,True,7,0,0,16,Ecommerce,Ecommerce,results/v23_gpt5_easy_all72/8/sessions/normal_agent.jsonl
+9,False,0,0,0,1,,64,results/v23_gpt5_easy_all72/9/sessions/normal_agent.jsonl

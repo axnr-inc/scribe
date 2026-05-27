@@ -1,0 +1,59 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Node / Python
+node_modules/
+dist/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.mypy_cache/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# DABStep redistributable artifacts (downloaded by scripts/fetch_dabstep_data.py)
+data/context/payments.csv
+data/context/fees.json
+data/context/merchant_data.json
+data/context/manual.md
+data/context/merchant_category_codes.csv
+data/context/acquirer_countries.csv
+data/context/payments-readme.md
+data/verified_answers.json
+
+# Verbose run artifacts — ship summaries + selected samples only
+results/**/sessions/
+results/**/specs/
+results/**/*.log
+results/**/preamble.py
+!results/samples/**
+!results/*.csv
+
+# Paper build noise
+paper/*.aux
+paper/*.log
+paper/*.synctex.gz
+paper/*.out
+paper/*.bbl
+paper/*.blg
+paper/*.fdb_latexmk
+paper/*.fls
+
+# IDE
+.claude/
+.idea/
+.vscode/
+
+# Paper sources kept separately (excluded from public code repo)
+paper/
+
+# Internal project deliberation, not for public release
+docs/notes/
