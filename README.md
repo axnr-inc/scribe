@@ -45,6 +45,18 @@ not flagged. The honest number is lower and we report it as-is.
 `vendor/kramabench_eval/`). Statistically tied with the best published agentic system
 (smolagents-DR Claude-3.7 at 55.83%) while using smaller open-weights executor models.
 
+| Domain | Tasks | Strict (≥0.999) | Lenient (≥0.5 partial-credit) |
+|---|---|---|---|
+| biomedical | 9 | 7 (77.8%) | 7 (77.8%) |
+| environment | 20 | 14 (70.0%) | 15 (75.0%) |
+| wildfire | 21 | 11 (52.4%) | 13 (61.9%) |
+| legal | 30 | 15 (50.0%) | 15 (50.0%) |
+| archeology | 12 | 4 (33.3%) | 4 (33.3%) |
+| astronomy | 12 | 4 (33.3%) | 4 (33.3%) |
+| **OVERALL** | **104** | **55/104 = 52.9%** | **58/104 = 55.8%** |
+
+Full breakdown and failure analysis in `docs/findings/18_krama104_results.md`.
+
 ### DABStep — 59.8% combined (dev set)
 
 | Split | SCRIBE | DS-STAR (Gemini-2.5-Pro) | DS-STAR (GPT-5) |
