@@ -29,7 +29,7 @@ from pathlib import Path
 
 import yaml
 
-DAB_ROOT = Path("/tmp/dab_clone")
+DAB_ROOT = Path("/Users/suraj/dab_clone")
 
 DATASETS = [
     "agnews",

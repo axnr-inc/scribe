@@ -205,6 +205,27 @@ def cpc_main_group(code: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
+def cpc_subclass_title(code: str, conn_pg) -> Optional[str]:
+    """Title of the code's SUBCLASS (4-char level), by EXACT symbol lookup.
+
+    'H01M10/0525' -> looks up symbol == 'H01M' in cpc_definition and returns
+    its titleFull. Never traverses the `parents` chain — ascending parents
+    returns section/class titles (e.g. 'GEOPHYSICS; ...'), which are the
+    wrong granularity for "primary CPC subclass" questions.
+
+    conn_pg: psycopg connection to the CPC-definition Postgres DB
+    (e.g. dab_helper.open_postgres('patent_CPCDefinition')).
+    """
+    sub = cpc_subclass(code)
+    if not sub:
+        return None
+    cur = conn_pg.execute(
+        'SELECT "titleFull" FROM cpc_definition WHERE symbol = %s', (sub,)
+    )
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
 # ---------------------------------------------------------------------------
 # EMA helper with self-test
 # ---------------------------------------------------------------------------

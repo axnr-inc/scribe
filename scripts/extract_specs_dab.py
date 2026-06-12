@@ -96,6 +96,10 @@ REFERENCE THEM BY NAME instead of writing inline regex:
 - country_from_pubno(pubno), is_country(text, country_code)
 - parse_cpc_field(json_str), cpc_codes(json_str), cpc_primary_code(json_str),
   cpc_subclass(code), cpc_main_group(code)
+- cpc_subclass_title(code, conn_pg) — titleFull of the code's 4-char SUBCLASS
+  by exact symbol lookup. For "primary CPC subclass title" questions use THIS;
+  never resolve titles by walking the `parents` chain (that ascends to broad
+  section/class titles and is the wrong granularity).
 - parse_citation_field(json_str), cited_publication_numbers(json_str)
 - exponential_moving_average(values, alpha) — adjust=False form, with
   _ema_self_test() that runs at import to verify correctness.
@@ -106,6 +110,10 @@ REFERENCE THEM BY NAME instead of writing inline regex:
 When the question asks "best year of patent filings" or "year with highest
 EMA of filings", the spec MUST call best_year_by_ema (or equivalently
 ewm(alpha=..., adjust=False).idxmax()) — NOT argmax of raw counts.
+The plan must pin EMA initialization EXPLICITLY (seed + zero-fill arguments,
+matching the helper's defaults). If the question itself does not pin the
+initialization and the choice changes the answer, surface seed='zero' vs
+seed='x0' as interpretations and declare interpretation_confidence 'split'.
 
 ## RULE 4 — Year axis must include zero-filled missing years
 
@@ -113,6 +121,23 @@ EMA on patent filings is sensitive to year-axis choice. The canonical
 choice is: build a complete year series from min(observed) to max(observed)
 inclusive, fill missing years with 0, then EMA across that. Do NOT EMA
 only the observed years — that biases later years upward.
+
+## RULE 4b — Filter-then-verify (MANDATORY for any cohort/date/entity filter)
+
+Whenever the plan filters rows (by country, date window, entity name,
+category...), the plan MUST include a verification step IMMEDIATELY after
+the filter and BEFORE any downstream metric:
+  1. print the cohort size and 2-3 sample rows;
+  2. sanity-check the sample against the question's constraints (e.g. for
+     "granted in H2 2019" the sampled grant dates must actually fall in
+     2019-07..2019-12 — and the filter must use the GRANT date field, not
+     filing/publication);
+  3. if the cohort is EMPTY or the sample violates the constraints, the
+     plan must say: re-derive the filter (try the other date field /
+     country encoding / entity spelling) or escalate via ask_planner_agent
+     — NEVER silently fall back to the unfiltered dataset.
+Silent filter failure is the single most damaging executor bug we observe:
+the metric then gets computed over ALL rows and looks plausible.
 
 ## RULE 5 — Filter strictness enumeration
 
@@ -244,6 +269,23 @@ evaluate ALL candidate policies systematically (compute each policy's
 condition against the record) rather than committing to the first
 plausible article. Read each candidate policy's actual text and test its
 condition; do not assume which policy is violated.
+
+## RULE 12 — Declare genuine coin flips with interpretation_confidence: 'split'
+
+After inspecting the schema and sampled data, decide honestly: does the
+evidence clearly favor one interpretation?
+
+- If YES: set interpretation_confidence to 'committed' and commit normally.
+- If NO — two (or more) readings remain comparably defensible and would
+  produce DIFFERENT answers (e.g. mean-over-reviews vs mean-over-businesses,
+  code-column vs name-column, which denominator, EMA seed) — set
+  interpretation_confidence to 'split' and order `interpretations`
+  most-plausible-first. The harness commits a different reading on each
+  trial, which is the optimal play under per-trial scoring.
+
+Declare 'split' ONLY for genuine coin flips: if you would bet 70/30 or
+better on one reading, commit it. Splitting a confidently-correct reading
+wastes trials; committing a coin flip risks all of them.
 
 """
 

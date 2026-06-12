@@ -110,6 +110,17 @@ SAVE_SPEC_TOOL = {
                 },
                 "description": "I-1: Which interpretation the computation_plan implements, with justification.",
             },
+            "interpretation_confidence": {
+                "type": "string",
+                "enum": ["committed", "split"],
+                "description": (
+                    "'committed' (default) when the docs/data clearly favor the chosen "
+                    "interpretation. 'split' when, AFTER inspecting the data, two or more "
+                    "interpretations remain comparably defensible (a genuine coin flip) — "
+                    "the harness will then rotate the committed reading across trials. "
+                    "Order `interpretations` most-plausible-first when declaring 'split'."
+                ),
+            },
             "data_sources_to_use": {
                 "type": "array",
                 "items": {"type": "string"},

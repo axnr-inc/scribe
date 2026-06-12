@@ -3,7 +3,7 @@ per-query validate.py.
 
 Each DAB task's `answer` field carries a JSON-encoded pointer
 {dataset, query} that locates the validate.py + ground_truth.csv inside the
-DAB clone (default: /tmp/dab_clone).
+DAB clone (default: /Users/suraj/dab_clone).
 
 USAGE:
     python3 scripts/score_dab.py \\
@@ -23,7 +23,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-DAB_ROOT = Path("/tmp/dab_clone")
+DAB_ROOT = Path("/Users/suraj/dab_clone")
 
 # Some validators (e.g. github_repos-q2) import from `common_scaffold` in the
 # DAB repo. Add the repo root to sys.path so those imports resolve.

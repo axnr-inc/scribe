@@ -371,6 +371,7 @@ async function runOneTask(
   prompt: PromptConfig,
   outDir: string,
   specsDir: string | null,
+  runIndex: number | null = null,
 ): Promise<{
   task_id: string;
   wall_seconds: number;
@@ -413,12 +414,15 @@ async function runOneTask(
     // placeholder + planner-agent prompt — the planner has nothing real to
     // revise from, so it's pure noise for the executor.
     let specHasError = false;
+    let specObj: Record<string, unknown> | null = null;
     if (fs.existsSync(candidatePath)) {
       try {
         const rawObj = JSON.parse(fs.readFileSync(candidatePath, "utf-8"));
         if (rawObj && typeof rawObj === "object" && "_error" in rawObj) {
           specHasError = true;
           console.warn(`  ${task.task_id}: spec has _error (${(rawObj as any)._error}); skipping injection`);
+        } else if (rawObj && typeof rawObj === "object") {
+          specObj = rawObj as Record<string, unknown>;
         }
       } catch { /* let renderer handle parse failure below */ }
     }
@@ -428,7 +432,35 @@ async function runOneTask(
       specPathForTask = candidatePath;
       const rendered = renderSpecFromPath(specPathForTask, fs);
       if (rendered) {
-        userText += "\n\n" + rendered + "\n\nIf uncertain about any step, escalate via ask_planner_agent.";
+        userText += "\n\n" + rendered;
+        // Interpretation rotation (Pass@1 trial diversity): when the spec
+        // declares a genuine coin-flip between readings
+        // (interpretation_confidence === "split") and a trial index was
+        // provided, commit a DIFFERENT branch on each trial instead of
+        // betting all 5 trials on one reading. Under the stratified
+        // per-trial Pass@1 this converts a 50/50 interpretation from
+        // an expected 0-or-5 into a guaranteed ~k/5. Selection uses only
+        // the spec's own ordering — never benchmark answers.
+        const interps = Array.isArray(specObj?.interpretations)
+          ? (specObj!.interpretations as Array<Record<string, unknown>>)
+          : [];
+        const split = specObj?.interpretation_confidence === "split";
+        if (runIndex !== null && split && interps.length >= 2) {
+          const chosen = interps[runIndex % interps.length];
+          const id = String(chosen?.id ?? `interpretation-${(runIndex % interps.length) + 1}`);
+          const reading = String(chosen?.reading ?? JSON.stringify(chosen));
+          const lines = [
+            "",
+            "**Surfaced interpretations** (the planning step judged these readings comparably defensible):",
+            ...interps.map((it, i) => `  ${i + 1}. [${String(it?.id ?? i + 1)}] ${String(it?.reading ?? "")}`),
+            "",
+            `**Committed interpretation for THIS attempt**: [${id}] ${reading}`,
+            "Implement THIS reading. Where the computation plan conflicts with it, adapt the plan to this reading. Do not hedge between readings.",
+          ];
+          userText += "\n" + lines.join("\n");
+          console.warn(`  ${task.task_id}: interpretation rotation active (run ${runIndex} -> ${id})`);
+        }
+        userText += "\n\nIf uncertain about any step, escalate via ask_planner_agent.";
       } else {
         console.warn(`  ${task.task_id}: spec file not found / unreadable at ${specPathForTask}; executor will see task only.`);
       }
@@ -636,7 +668,8 @@ async function main() {
     .requiredOption("-o, --out-dir <path>", "Output directory for per-task results")
     .option("--specs <dir>", "Directory of per-task spec JSON files (required if config has a `planner` field — enables ask_planner tool)")
     .option("-n, --notes <text>", "Free-form notes for this run", "")
-    .option("-w, --workers <n>", "parallel task workers", "1");
+    .option("-w, --workers <n>", "parallel task workers", "1")
+    .option("--run-index <n>", "trial index (0-based). Enables per-trial interpretation rotation for specs with interpretation_confidence: 'split'");
 
   program.parse();
   const opts = program.opts();
@@ -649,6 +682,7 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true });
 
   const specsDir = opts.specs ? path.resolve(opts.specs) : null;
+  const runIndex: number | null = opts.runIndex !== undefined ? parseInt(opts.runIndex, 10) : null;
   if (config.planner && !specsDir) {
     console.warn(`  WARN: config has a planner field but --specs was not provided. ask_planner tool will be DISABLED.`);
   }
@@ -664,6 +698,7 @@ async function main() {
     model: config.model,
     planner: config.planner,
     specs_dir: specsDir,
+    run_index: runIndex,
     prompt_version: config.prompt_version,
     max_iterations: config.execution.max_iterations,
     notes: opts.notes,
@@ -701,7 +736,7 @@ async function main() {
       if (queue.length === 0) return;
       const task = queue.shift()!;
       console.log(`[task ${task.task_id}] starting...`);
-      const result = await runOneTask(task, config, prompt, outDir, specsDir);
+      const result = await runOneTask(task, config, prompt, outDir, specsDir, runIndex);
       console.log(`  done in ${result.wall_seconds.toFixed(1)}s, $${result.cost_usd.toFixed(4)}, tc=${result.tool_calls}, ask_planner=${result.ask_planner_calls}, tb=${result.thinking_blocks}, hit_cap=${result.hit_iter_cap}`);
       await updateSummary(result);
       await runNext();

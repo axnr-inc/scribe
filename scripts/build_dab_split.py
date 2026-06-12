@@ -16,7 +16,7 @@ import re
 import yaml
 from pathlib import Path
 
-DAB_ROOT = Path("/tmp/dab_clone")
+DAB_ROOT = Path("/Users/suraj/dab_clone")
 SCRIBE_DATA = Path(__file__).resolve().parents[1] / "data" / "dataagentbench"
 OUT_PATH = Path(__file__).resolve().parents[1] / "data" / "splits" / "dab_all51.jsonl"
 

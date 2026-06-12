@@ -9,7 +9,7 @@ import argparse, importlib.util, json, sys
 from collections import defaultdict
 from pathlib import Path
 
-DAB_ROOT = Path("/private/tmp/dab_clone")
+DAB_ROOT = Path("/Users/suraj/dab_clone")
 
 _cache: dict = {}
 def load_validator(dataset: str, query: str):
