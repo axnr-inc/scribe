@@ -1,8 +1,13 @@
 """Spec extractor — Stage 1 of grafting.
 
 Reads manual.md + fees.json + merchant_data.json + payments-readme.md plus a task question,
-and emits a structured rule-extraction spec via tool_use (Anthropic models) or
-JSON response (OpenRouter models). One spec per task. Saved to results/<arm>/specs/<task_id>.json.
+and emits a structured rule-extraction spec via tool_use. One spec per task.
+
+P2b upgrades (this version):
+  - P2b.1: spec_agent now has a `read_file` tool (manifest scoped to data/context/).
+  - P2b.2: spec_agent now has `query_fees` and `list_files` for programmatic lookup.
+  - P2b.3: multi-shot reasoning loop (cap 5 tool turns). The model may call any
+    helper tool before save_spec; loop terminates when save_spec is called.
 
 Examples:
   # Sonnet as planner:
@@ -33,8 +38,18 @@ from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
+sys.path.insert(0, str(ROOT / "scripts"))
 
 CONTEXT_DIR = ROOT / "data/context"
+
+from spec_extraction_tools import (  # noqa: E402
+    make_read_file_tool,
+    make_list_files_tool,
+    make_query_fees_tool,
+    make_dabstep_dispatcher,
+    run_anthropic_spec_loop,
+    run_openai_spec_loop,
+)
 
 
 SAVE_SPEC_TOOL = {
@@ -97,7 +112,34 @@ SAVE_SPEC_TOOL = {
 
 
 SYSTEM_PROMPT = """\
-You are a spec agent. You read source documents (a manual, schemas, rule catalogs, and similar reference material in the user message) and produce a structured specification an executor agent will use to compute the answer to a user task. You also REVIEW the executor's work when it later calls back to you with a structured summary.
+You are the SPEC AGENT. You read source documents (a manual, schemas, rule catalogs, and similar reference material in the user message) and produce ONE structured specification an executor agent will then use to compute the answer to a user task.
+
+This is a MULTI-SHOT extraction. You may call helper tools to verify facts before committing to the spec. You have up to 5 tool turns total; use them deliberately. A separate PLANNER AGENT (with its own prompt and tools) handles any later review or revision when the executor escalates.
+
+# Tools available to you
+
+- read_file(filename): re-read a source artifact from data/context/ (see the
+  manifest in the tool description). Use this to re-check a definition or
+  formula before committing your spec.
+- list_files(): list every file in data/context/. Call this if you're unsure
+  what's available.
+- query_fees(filters, limit=50): programmatic lookup over fees.json with
+  correct wildcard semantics (null OR empty-list = matches any value). Prefer
+  this over scanning fees.json by eye when enumerating rules.
+- save_spec(...): emit your final structured spec. This terminates extraction.
+
+Required tool-use discipline: BEFORE calling save_spec, you SHOULD verify at
+least one key fact via a helper tool. Typical patterns:
+- If the question names a merchant, call query_fees with merchant attributes
+  (look them up via read_file('merchant_data.json') first) to enumerate the
+  actual applicable fee rules.
+- If the question references a named metric or formula, call read_file('manual.md')
+  to re-anchor on the exact definition before drafting the computation_plan.
+- If you're unsure about a column or field, call read_file('payments-readme.md').
+
+Calling save_spec on turn 1 without any helper-tool verification is a sign you
+didn't actually check the docs; do that only when the user message above
+already contains everything you need.
 
 # Meta-rules for high-quality specs
 
@@ -116,52 +158,9 @@ You are a spec agent. You read source documents (a manual, schemas, rule catalog
 5. FILTER EXPLICITNESS.
    Spell out filter predicates in pandas notation, not English alone. Include all relevant fields with their wildcard/null handling.
 
-# Output (initial extraction)
+# Output
 
-Use the `save_spec` tool to emit the structured spec. Output ONLY the spec; do not execute code.
-
-# When called for review (follow-up turn)
-
-If you receive a follow-up user message containing the executor's STRUCTURED SUMMARY (with headers `# Step` / `# Computed so far` / `# Pseudo-code` / `# Assumptions` / `# Question`), follow this protocol:
-
-1. Read the executor's structured summary carefully.
-
-2. Use the `read_file` tool to re-read the relevant source documents. You MUST call read_file at least once before replying — verify the executor's assumptions against what the docs actually say.
-
-3. Compare each of the executor's stated assumptions against the docs:
-   - If any assumption is INCONSISTENT with the docs, flag it.
-   - If the executor missed a rule, definition, or constraint that the docs state, flag it.
-
-4. Reply format:
-   - If you found a mistake:
-       [Flag: mistake detected]
-       <quote the relevant doc passage>
-       <revised understanding>
-       [Revised spec]
-       <FULL revised spec, same schema as the initial save_spec output, with the fix applied>
-       The executor will replace its working spec with this revised version.
-   - If you found no mistake:
-       [No flag]
-       <answer the executor's specific question, grounded in doc quotes>
-       If the docs are silent on the question, say so explicitly and suggest a defensible default with rationale.
-
-5. What you must NOT do:
-   - Do not flag a mistake based on intuition. Flag only when you can quote the doc passage that contradicts the executor's assumption.
-   - Do not return a revised spec unless you have flagged a real, doc-grounded mistake.
-   - Do not change the spec just because the executor seemed unsure — answer the question instead.
-
-6. NEVER return an empty or "(no content)" response.
-   Every review reply MUST include:
-   - The header `[Flag: mistake detected]` or `[No flag]` (exactly one of the two)
-   - At least one direct quote from a source document (you MUST have called read_file before replying)
-   - A concrete diagnostic line stating what you found, e.g. "Found 47 matching rules after re-reading fees.json" or "Confirmed: zero rules match after checking account_type, MCC, and card_scheme constraints"
-
-   When the executor's question is about whether to commit "Not Applicable":
-   - You MUST attempt the data lookup yourself before signing off on NA.
-   - Format your reply as: "Attempted lookup → found X matching rules. Therefore [NA is correct / NA is wrong; correct rule IDs are Y, Z...]."
-   - Do NOT confirm NA based on the executor's report alone; verify by re-reading the relevant files.
-
-   An empty or sentinel-only response is an unacceptable failure mode; if you cannot help, you must at minimum state WHY (e.g., "Unable to access fees.json; cannot verify executor's claim").
+Call the `save_spec` tool ONCE with the final structured spec. Do not call other tools after save_spec.
 """
 
 
@@ -239,106 +238,61 @@ def build_user_prompt(task: dict, context: dict) -> str:
     return "\n\n".join(parts)
 
 
+def _dabstep_helper_tools() -> list[dict]:
+    return [
+        make_read_file_tool(CONTEXT_DIR, suggest_for_sqlite=False),
+        make_list_files_tool(CONTEXT_DIR),
+        make_query_fees_tool(),
+    ]
+
+
 def call_anthropic(model: str, user: str, max_tokens: int = 8000) -> tuple[dict, dict, dict]:
-    """Returns (spec, usage, session) where session is the seed conversation history
-    (system + user + assistant) that ask_planner will resume in subsequent turns."""
+    """Multi-shot extraction via Anthropic native tool_use. Returns (spec, usage, session)."""
     import anthropic
     if not os.environ.get("ANTHROPIC_API_KEY"):
         raise SystemExit("ANTHROPIC_API_KEY not in .env")
     client = anthropic.Anthropic()
-    resp = client.messages.create(
+    spec, usage, session, telem = run_anthropic_spec_loop(
+        client=client,
         model=model,
-        max_tokens=max_tokens,
         system=SYSTEM_PROMPT,
-        tools=[SAVE_SPEC_TOOL],
-        tool_choice={"type": "tool", "name": "save_spec"},
-        messages=[{"role": "user", "content": user}],
+        user_prompt=user,
+        helper_tools=_dabstep_helper_tools(),
+        save_spec_tool=SAVE_SPEC_TOOL,
+        dispatch=make_dabstep_dispatcher(CONTEXT_DIR),
+        max_tokens=max_tokens,
     )
-    spec = None
-    for block in resp.content:
-        if block.type == "tool_use" and block.name == "save_spec":
-            spec = block.input
-            break
     if spec is None:
-        raise RuntimeError(f"No tool_use block returned. Stop reason: {resp.stop_reason}")
-    usage = {"input_tokens": resp.usage.input_tokens, "output_tokens": resp.usage.output_tokens}
-    # Build the session seed. Anthropic's API requires that every tool_use block in an
-    # assistant message be followed IMMEDIATELY by a user message containing a tool_result
-    # block with the matching tool_use_id. The extraction call ended with a tool_use
-    # (save_spec) and never received a tool_result, so we synthesise one — the conversation
-    # is now well-formed and ask_planner can simply append another user message.
-    assistant_content = [b.model_dump() for b in resp.content]
-    tool_use_blocks = [b for b in assistant_content if b.get("type") == "tool_use"]
-    synthetic_tool_results = [
-        {
-            "type": "tool_result",
-            "tool_use_id": b["id"],
-            "content": "Spec saved. The conversation may continue if the executor escalates a question.",
-        }
-        for b in tool_use_blocks
-    ]
-    session = {
-        "provider": "anthropic",
-        "model": model,
-        "system": SYSTEM_PROMPT,
-        "tools": [SAVE_SPEC_TOOL],
-        "messages": [
-            {"role": "user", "content": user},
-            {"role": "assistant", "content": assistant_content},
-            # synthetic tool_result so the conversation is API-valid for follow-ups
-            {"role": "user", "content": synthetic_tool_results} if synthetic_tool_results else {"role": "user", "content": ""},
-        ],
-    }
+        raise RuntimeError(
+            f"spec_agent never called save_spec (hit_cap={telem['hit_cap']}, "
+            f"forced_save={telem['forced_save']}, tool_calls_before_save={telem['tool_calls_before_save']})"
+        )
     return spec, usage, session
 
 
 def call_openrouter(model: str, user: str, max_tokens: int = 16000) -> tuple[dict, dict, dict]:
-    """OpenRouter via OpenAI-compatible endpoint, json_object response format.
-    Returns (spec, usage, session) — session is the OpenAI-style messages history
-    that ask_planner can resume."""
+    """Multi-shot extraction via OpenRouter (OpenAI tool-calling). Returns (spec, usage, session)."""
     from openai import OpenAI
     key = os.environ.get("OPENROUTER_API_KEY")
     if not key:
         raise SystemExit("OPENROUTER_API_KEY not in .env")
-    # Tight timeout to fail fast on rare unresponsive requests; no retries — we want to skip & continue.
     client = OpenAI(api_key=key, base_url="https://openrouter.ai/api/v1", timeout=180.0, max_retries=0)
-
-    # Embed the schema in the system prompt for OpenRouter (no tool_use on all providers).
-    system_with_schema = SYSTEM_PROMPT + (
-        "\n\nOutput requirement: respond with ONE valid JSON object matching this schema. "
-        "No markdown, no preamble. Use \\n for any newlines inside string values.\n\n"
-        f"Schema:\n{json.dumps(SAVE_SPEC_TOOL['input_schema'], indent=2)}"
-    )
-    resp = client.chat.completions.create(
+    spec, usage, session, telem = run_openai_spec_loop(
+        client=client,
         model=model,
+        system=SYSTEM_PROMPT,
+        user_prompt=user,
+        helper_tools=_dabstep_helper_tools(),
+        save_spec_tool=SAVE_SPEC_TOOL,
+        dispatch=make_dabstep_dispatcher(CONTEXT_DIR),
+        provider_label="openrouter",
         max_tokens=max_tokens,
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": system_with_schema},
-            {"role": "user", "content": user},
-        ],
     )
-    content = resp.choices[0].message.content or ""
-    # strip fences if present
-    content = content.strip()
-    if content.startswith("```"):
-        content = content[content.find("\n")+1:]
-        if content.rstrip().endswith("```"):
-            content = content.rstrip().rstrip("`").rstrip()
-    spec = json.loads(content)
-    usage = {
-        "input_tokens": getattr(resp.usage, "prompt_tokens", 0),
-        "output_tokens": getattr(resp.usage, "completion_tokens", 0),
-    }
-    session = {
-        "provider": "openrouter",
-        "model": model,
-        "system": system_with_schema,
-        "messages": [
-            {"role": "user", "content": user},
-            {"role": "assistant", "content": resp.choices[0].message.content or ""},
-        ],
-    }
+    if spec is None:
+        raise RuntimeError(
+            f"spec_agent never called save_spec (hit_cap={telem['hit_cap']}, "
+            f"forced_save={telem['forced_save']}, tool_calls_before_save={telem['tool_calls_before_save']})"
+        )
     return spec, usage, session
 
 
@@ -365,7 +319,8 @@ def main():
     for t in tasks:
         tid = str(t.get("task_id", t.get("id", "")))
         out_path = out_dir / f"{tid}.json"
-        session_path = out_dir / f"{tid}.session.json"
+        original_path = out_dir / f"{tid}.original.json"
+        session_path = out_dir / f"{tid}.spec_session.json"
         print(f"\n  extracting spec for {tid} ...", flush=True)
         try:
             user = build_user_prompt(t, context)
@@ -376,15 +331,27 @@ def main():
             else:
                 raise SystemExit(f"Unknown provider: {provider}")
 
-            spec["_meta"] = {"extractor": f"{provider}:{model}", **usage}
-            out_path.write_text(json.dumps(spec, indent=2))
-            # Persist the conversation seed so ask_planner can resume in the same
-            # "session" (continuity of context — manual.md, fees.json, the assistant's
-            # own spec-writing reasoning — all carry forward into escalation calls).
+            meta = session.get("metadata") or {}
+            spec["_meta"] = {
+                "extractor": f"{provider}:{model}",
+                **usage,
+                "tool_calls_before_save": meta.get("tool_calls_before_save", 0),
+                "hit_cap": meta.get("hit_cap", False),
+                "forced_save": meta.get("forced_save", False),
+            }
+            spec_text = json.dumps(spec, indent=2)
+            # <tid>.json is the CURRENT spec; planner overwrites it on SPEC_WRONG revisions.
+            out_path.write_text(spec_text)
+            # <tid>.original.json is the immutable initial extraction (for audit / ablation).
+            original_path.write_text(spec_text)
+            # <tid>.spec_session.json is the spec_agent's extraction conversation, kept for
+            # audit only. The planner_agent does NOT resume this session; it starts its own.
             session_path.write_text(json.dumps(session, indent=2))
             steps = len(spec.get("computation_plan") or [])
-            print(f"    OK — {steps} plan steps. in={usage['input_tokens']} out={usage['output_tokens']} tokens.")
-            print(f"    session seed → {session_path.name}")
+            n_tools = meta.get("tool_calls_before_save", 0)
+            print(f"    OK — {steps} plan steps, {n_tools} tool calls before save. "
+                  f"in={usage['input_tokens']} out={usage['output_tokens']} tokens.")
+            print(f"    spec → {out_path.name} + {original_path.name} (audit: {session_path.name})")
         except Exception as e:
             print(f"    ERROR: {e}")
             out_path.write_text(json.dumps({"_error": str(e)}, indent=2))

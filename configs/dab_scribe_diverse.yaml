@@ -1,0 +1,34 @@
+# DAB SCRIBE — model-diverse: Opus 4.7 executor, Sonnet 4.6 reviewer.
+# Hypothesis: PATENTS failures are F-E ceiling (executor + reviewer
+# share Opus's bias toward "one definitive answer"). A different model
+# for the reviewer may catch the multi-row shape miss.
+
+model:
+  provider: anthropic
+  model: claude-opus-4-7
+  prompt_caching: true
+  thinking: "xhigh"
+  temperature: null
+  top_p: null
+  max_tokens: null
+
+prompt_version: krama_grafted
+
+planner:
+  provider: anthropic
+  model: claude-sonnet-4-6  # was claude-opus-4-7
+
+execution:
+  mode: quick
+  max_iterations: 40
+  tool_execution: sequential
+  rate_limit_retries: 10
+  overloaded_retries: 10
+
+connection:
+  dialect: local
+  dataset: ""
+  project_id: ""
+  credential_path: ""
+  context_dir: ""
+  python_bin: python3

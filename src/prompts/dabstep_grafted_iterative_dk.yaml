@@ -13,7 +13,7 @@ tools_section: |
     `attr_matches_wildcard`, `rule_applies(rule, txn, merchant=None)`, `fee_for_rule`.
     Source at `data/context/dabstep_helper.py`. Call these by name; do not redefine.
 
-  ## ask_spec_agent(summary_and_question)
+  ## ask_planner_agent(summary_and_question)
   Call when you have a real uncertainty: filter/formula doubt, edge case the spec
   doesn't cover, mismatch between intermediate result and what you expected, or
   uncertainty about a metric definition / tie-break. Before committing
@@ -27,26 +27,35 @@ tools_section: |
       # Assumptions
       # Question
 
-  The spec agent reads source docs and either flags a mistake (with a revised spec)
-  or answers with doc quotes.
+  The planner reads source docs and replies with EXACTLY one verdict header:
+  [Verdict: SPEC_WRONG] (revised spec attached, file overwritten — call
+  read_current_spec() to confirm), [Verdict: BLIND_SPOT] (you had a silent
+  wrong assumption; address it), [Verdict: EXECUTOR_WRONG] (fix the specific
+  code error; spec stays), [Verdict: NA_CONFIRMED] (commit 'Not Applicable'
+  immediately), or [Verdict: ANSWER] (use the doc-grounded answer; continue).
+  See `dabstep_grafted_iterative.yaml` for the full per-verdict action descriptions.
+
+  ## read_current_spec()
+  Zero-cost re-read of the CURRENT spec from disk. Call this after a
+  [Verdict: SPEC_WRONG] reply to confirm the active spec.
 
   # Workflow
   1. Read the spec; identify steps and any ambiguity.
   2. For each step: implement using the canonical helpers; verify intermediate results.
-  3. If uncertain, ask_spec_agent BEFORE committing.
+  3. If uncertain, ask_planner_agent BEFORE committing.
   4. Print final answer on its OWN LINE as the LAST line, in the exact
      `expected_output_format` from the spec.
 
 quick_rules: |
   - Match the format EXACTLY (spec's `expected_output_format` is authoritative).
   - Use `rule_applies(rule, txn, merchant)` for rule-matching; do not redefine.
-  - If a result looks wrong, ask_spec_agent with a structured summary.
+  - If a result looks wrong, ask_planner_agent with a structured summary.
   - If matching produces zero results AND that matches task intent, print 'Not Applicable'.
   - Final answer on its OWN LINE as the LAST line. No trailing prose.
 
 deep_rules: |
   - Verify intermediate results against the data before proceeding.
-  - When in doubt, ask_spec_agent — escalation is cheap; a wrong commit is costly.
+  - When in doubt, ask_planner_agent — escalation is cheap; a wrong commit is costly.
   - Before submitting 'Not Applicable', verify with the spec agent.
   - Print final answer in the exact format specified.
 

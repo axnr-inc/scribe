@@ -1,0 +1,39 @@
+# KramaBench SCRIBE config — v3b (open-source-only, Fireworks executor).
+# Topology: Kimi-K2.6 executor on Fireworks2 (FIREWORKS_API_KEY2);
+# DeepSeek-V3.1 spec+planner on OpenRouter. Both open-source.
+# v3b vs v3: same planner+spec stack, but executor swapped back to Kimi-K2.6
+# because v3's Qwen3-Coder-30B bypassed the cascade (ask_planner_calls=0 on
+# 4/5 tasks). Goal: isolate whether I-1+I-3 interventions help when the
+# executor actually follows the escalation discipline.
+
+model:
+  provider: fireworks2
+  model: accounts/fireworks/models/kimi-k2p6
+  thinking: null
+  prompt_caching: false
+  temperature: null
+  top_p: null
+  max_tokens: null
+
+prompt_version: krama_grafted
+
+planner:
+  provider: openrouter
+  model: deepseek/deepseek-chat-v3.1
+
+execution:
+  mode: quick
+  max_iterations: 40
+  tool_execution: sequential
+  rate_limit_retries: 5
+  overloaded_retries: 10
+
+connection:
+  dialect: local
+  dataset: ""
+  project_id: ""
+  credential_path: ""
+  # context_dir is OVERRIDDEN per-task by task.context_dir (KramaBench's
+  # per-domain data lakes are at data/kramabench/data/<domain>/input/).
+  context_dir: ""
+  python_bin: python3

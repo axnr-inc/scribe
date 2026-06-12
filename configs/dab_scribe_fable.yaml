@@ -1,0 +1,33 @@
+# DataAgentBench SCRIBE — Claude Fable 5 across all three roles.
+# Pure-Fable apples-to-apples vs the Opus 4.7 run.
+# Fresh Fable-extracted specs (see scripts/extract_specs_dab.py --extractor anthropic:claude-fable-5).
+
+model:
+  provider: anthropic
+  model: claude-fable-5
+  prompt_caching: true
+  thinking: "xhigh"      # pi-ai patched to map xhigh -> effort:xhigh for fable-5
+  temperature: null
+  top_p: null
+  max_tokens: null
+
+prompt_version: krama_grafted
+
+planner:
+  provider: anthropic
+  model: claude-fable-5
+
+execution:
+  mode: quick
+  max_iterations: 40
+  tool_execution: sequential
+  rate_limit_retries: 10
+  overloaded_retries: 10
+
+connection:
+  dialect: local
+  dataset: ""
+  project_id: ""
+  credential_path: ""
+  context_dir: ""
+  python_bin: python3

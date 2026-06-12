@@ -4,3 +4,10 @@ python-dotenv>=1.0
 pandas>=2.0
 numpy>=1.24
 huggingface_hub>=0.20.0
+# KramaBench file sampling: xlsx (openpyxl), parquet (pyarrow).
+# openpyxl is REQUIRED for the Krama spec extractor (most domains have xlsx).
+# pyarrow is needed when sampling parquet files (astronomy / wildfire).
+openpyxl>=3.1
+pyarrow>=14
+# P1 verifiers: deterministic SQL parsing (Tier-B verify on run_sql).
+sqlglot>=25

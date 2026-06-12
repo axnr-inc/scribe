@@ -1,3 +1,7 @@
+# LEGACY (pre-P2): execution-only variant; does NOT describe verdict handling.
+# May not pair correctly with --specs (run.ts will still wire ask_planner_agent
+# but this prompt won't teach the executor how to react to verdicts). Behaviour
+# unchanged; prefer dabstep_grafted_iterative.yaml for spec+planner runs.
 name: dabstep_grafted
 description: For grafted runs — a planner has already given you the rule-extraction spec. You only EXECUTE.
 

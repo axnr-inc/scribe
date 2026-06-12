@@ -1,0 +1,37 @@
+# DataAgentBench SCRIBE — Opus 4.7 throughout
+# SQLite + DuckDB subset (5 datasets, 17 queries, no server lifecycle required).
+# Single-pass, no re-roll. Hints: Yes (db_description_withhint.txt folded into guidelines).
+#
+# Cost ceiling estimate: ~$5 for 17 tasks single-trial (much lower than Krama-104
+# at $23 because no spec/exec/review thinking on the executor and ~17 queries
+# instead of 104).
+
+model:
+  provider: anthropic
+  model: claude-opus-4-7
+  prompt_caching: true
+  thinking: "xhigh"
+  temperature: null
+  top_p: null
+  max_tokens: null
+
+prompt_version: krama_grafted
+
+planner:
+  provider: anthropic
+  model: claude-opus-4-7
+
+execution:
+  mode: quick
+  max_iterations: 40
+  tool_execution: sequential
+  rate_limit_retries: 10
+  overloaded_retries: 10
+
+connection:
+  dialect: local
+  dataset: ""
+  project_id: ""
+  credential_path: ""
+  context_dir: ""
+  python_bin: python3

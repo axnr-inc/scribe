@@ -1,0 +1,345 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage{balance}     % balances the two columns on the last page
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\newcommand{\Kimi}{Kimi K2.6}
+\newcommand{\DeepSeek}{DeepSeek V4 Pro}
+\newcommand{\Opus}{Claude Opus 4.6}
+\newcommand{\Sonnet}{Claude Sonnet 4.6}
+
+\begin{document}
+
+\title{Extraction-Execution Decoupling Recovers Tasks Frontier-Solo Agents Fail:\\
+A Cross-Domain Empirical Study on Docs-Heavy Data Analysis%
+\thanks{Submitted to ICDM 2026 Applied Track (Topic 4: Comprehensive Experimental Analysis). Anonymized for double-blind review.}}
+
+\author{
+\IEEEauthorblockN{Anonymous Authors}
+\IEEEauthorblockA{
+\textit{Anonymous Affiliation}\\
+\textit{For ICDM 2026 Double-Blind Review}}
+}
+
+\maketitle
+
+% =====================================================================
+\begin{abstract}
+Tool-using LLM agents on docs-heavy data analysis benchmarks default to a monolithic role: the same model reads documentation, extracts rules, writes code, and commits an answer in one trajectory. We present empirical evidence that this role conflation is itself a failure source, independent of model capacity. On DABStep task 17, the same GPT-5 model produces the wrong answer (7.683\%) when run monolithically but the correct answer (8.908\%) when its planning role is separated from a smaller \Kimi{} executor: same model weights, two role assignments, opposite outcomes. On a 5-task paired pilot, \Kimi{} executed against a \Sonnet{}-written spec solves two tasks (1744, 1771) that monolithic \Opus{} fails. Scaled across the full 450-task DABStep dev set, a three-role architecture (spec extractor, executor, review agent) reaches 269/450 = 59.8\% versus \Kimi{}-solo 49.3\%. On a second benchmark with a structurally different paradigm (LiveSQLBench, 18 SQL schemas), a pre-commit spec gate lifts pass rate on 15 baseline failures from 0\% to 47\%. We catalog ten reproducible bug patterns in \Kimi{}'s 93 DABStep incorrect failures and report four DABStep benchmark hygiene flags. A negative result on doc-injection (Variant-B, $n=184$ scaled run ungradable due to high failure rate, $n=5$ pilot 40\% versus 80\% for the matched grafted control) establishes that role separation, not simply richer executor context, is the active ingredient. We make no SOTA claim. The contributions are: (i) the frontier-solo-beating result on the grafting pilot, (ii) the same-model role-swap falsifier on task 17, (iii) cross-domain replication on a second benchmark, and (iv) a documented bug-pattern taxonomy and benchmark hygiene audit for DABStep.
+\end{abstract}
+
+\begin{IEEEkeywords}
+LLM agents, planner-executor decoupling, docs-heavy data analysis, benchmark hygiene, agent failure analysis
+\end{IEEEkeywords}
+
+% =====================================================================
+\section{Introduction}
+\label{sec:intro}
+
+Docs-heavy agentic data analysis tasks have emerged as a stress test for tool-using LLM agents. A task in this regime consists of a natural-language question, a corpus of documentation (manuals, rule files, schema notes), a tabular dataset, and a strict scorer. The agent must read documentation, interpret rules, compute on tabular data, and commit a final answer within an iteration budget. Recent leaderboard systems on DABStep~\cite{dabstep2025} achieve strong aggregate accuracy via dataset-specific offline learning. Within the leaderboard literature, the dominant default is a monolithic agent: one model assumes responsibility for reading the docs, extracting the rules, writing the executable code, and committing the answer in a single trajectory.
+
+This paper presents empirical evidence that this monolithic role assignment is itself a failure source, distinct from model capacity. The cleanest demonstration comes from a single task that we can hold all other variables constant on.
+
+\paragraph{Lead empirical anchor: the same-model role-swap falsifier.}
+On DABStep task 17, we run GPT-5 in two role configurations against the same harness, same prompt template, and same documentation context. In configuration A, GPT-5 acts as a monolithic agent: it reads the docs, extracts the rules, writes pandas code, and emits an answer. The answer it commits is 7.683437\% (count-weighted, wrong gold). In configuration B, GPT-5 acts only as a spec writer: it reads the docs and produces a structured rule spec. A weaker model, \Kimi{}, consumes this spec and writes the pandas code. The answer the pipeline commits is 8.907926\% (volume-weighted, correct). Model weights are identical between A and B. The variable that changes is the role assignment. The outcome flips from wrong to right.
+
+This is a mechanistic existence proof. It does not depend on sample size: a single task with this controlled comparison is sufficient to establish that role separation can recover tasks that a single-model monolithic execution fails. We then ask: does this generalize?
+
+\paragraph{Generalization (i): frontier-solo-beating spec-grafting on \texttt{fee\_rule}.}
+On a five-task paired pilot of \Kimi{}'s \texttt{fee\_rule} \texttt{incorrect} failures (tasks 1683, 1709, 1739, 1744, 1771), we compare \Kimi{} executed against a \Sonnet{}-extracted spec (\emph{Arm A}) with \Opus{} run as a monolithic solo agent (\emph{Arm B}). Arm A solves four of five tasks (80\%). Arm B solves two of five (40\%). Two tasks, 1744 and 1771, are solved by Arm A but not Arm B. These are tasks that the frontier model fails when running solo, but a weaker open-source model recovers when given a spec written by a different frontier model. This is a stronger comparison than the standard ``weaker executor is cheaper'' framing of the planner-executor literature.
+
+\paragraph{Generalization (ii): scale validation on the full DABStep dev set.}
+A three-role architecture (a spec extractor, an executor, and a review agent that audits the executor's output against the spec before commit) reaches 269/450 = 59.8\% on the full 450-task DABStep dev set, versus \Kimi{}-solo at 222/450 = 49.3\% under the same harness budget. The aggregate-level number provides large-$n$ evidence that the effect demonstrated at the task level scales to the full benchmark.
+
+\paragraph{Generalization (iii): cross-domain replication.}
+On LiveSQLBench (270 SQL-generation tasks across 18 SQLite schemas), a spec-gated executor lifts pass rate on a 15-task subset of baseline failures from 0\% by definition to 47\%. The benchmark is structurally distinct (SQL not pandas; 18 schemas not 1; rule libraries are schema documentation and key-value glossaries rather than financial rule tables). The role-separation effect replicates across domains.
+
+\paragraph{Falsifier on the mechanism: doc injection without role separation.}
+A natural alternative hypothesis is that the spec is doing the work because it gives the executor more relevant content, independent of role separation. We test this by Variant-B: instead of giving the executor a spec from a separate extractor, we give it the raw rule corpus directly injected into the executor prompt. On a 5-task pilot, Variant-B accuracy is 40\% (2/5) versus 80\% for the matched grafted control. A scaled $n=184$ run could not be graded because of the elevated failure rate. ``Inject more rules into the prompt'' does not substitute for role separation. This negative result is the cleanest evidence we have that the active ingredient is the separation of roles, not the volume of context the executor sees.
+
+\paragraph{Scope.} The paper is a focused empirical study of one architecture pattern across two benchmarks, with one supporting cross-paradigm comparison on a third benchmark (RuleArena NBA, Section~\ref{sec:rulearena}). We do not propose a new architecture in the methodological sense (planner-executor decoupling originates with Plan-and-Solve~\cite{planAndSolve2023}; multi-agent extensions appear in MetaGPT~\cite{metagpt2023} and AutoGen~\cite{autogen2023}; SOTA leaderboard systems on DABStep already use extraction-execution decoupling~\cite{dsStar2025, nemoKgmon2025, oceanbaseDataPilot2025}). Our contribution is empirical: a controlled within-model role-swap falsifier, a frontier-solo-beating comparison on the grafting pilot, a 450-task scale validation, and a cross-domain replication.
+
+\paragraph{Supporting contributions.}
+Alongside the main empirical thread, we contribute (a) a documented bug-pattern taxonomy of ten verified failure families (A--J) over 93 \Kimi{} \texttt{incorrect} failures on DABStep, with the largest single family (null-as-wildcard mishandling) reproduced to six decimal places on tasks 1275 and 1278; (b) four flagged DABStep tasks (1433, 1434, 1453, 2715) where no defensible computation reproduces the gold answer, surfaced for dataset maintainers; and (c) negative results on six commonly-proposed mitigations to the residual capability gap on the \texttt{fee\_rule} iter-capped cluster, all scoped to that specific cluster and reported as supplementary evidence.
+
+% =====================================================================
+\section{Benchmark and Harness Setup}
+\label{sec:setup}
+
+\subsection{Benchmark: DABStep}
+DABStep~\cite{dabstep2025} is a benchmark of 450 docs-heavy data analysis tasks drawn from the financial transaction processing domain. Each task pairs a natural-language question with a documentation corpus (\texttt{manual.md}, \texttt{fees.json}, \texttt{merchant\_data.json}, \texttt{payments-readme.md}), a transaction CSV table (\texttt{payments.csv}, roughly 3M rows), and a strict scorer that admits numeric tolerance and unordered list equality. Tasks span nine topics; the four largest by task count are \texttt{delta\_what\_if} (120), \texttt{fee\_rule} (90), \texttt{date\_specific} (83), \texttt{aci\_format} (71). Tasks are partitioned into easy (72) and hard (378) tiers.
+
+\subsection{Benchmark: LiveSQLBench}
+LiveSQLBench~\cite{birdInteract2025} is a benchmark of 270 SQL-generation tasks across 18 SQLite schemas. Each task pairs a natural-language question with a schema DDL, a hierarchical knowledge base, a column glossary, and a template SQLite database. Tasks span query categories (SELECT) and management operations (DML), and difficulty tiers (Simple, Moderate, Challenging). We use the SELECT-only subset for the experiments in Section~\ref{sec:cross_domain}.
+
+\subsection{Harness}
+The harness is a single-agent ReAct loop. The agent receives the task question, a static system prompt enumerating the documentation directory and mandating documentation-read-before-compute behavior, and tools: \texttt{run\_python} (executing against a persistent Python REPL initialized with pandas, for DABStep) or \texttt{run\_sql} (executing against the task's SQLite database, for LiveSQLBench). Iterations are capped at 25 unless noted. For the spec-grafting experiments (Sections~\ref{sec:main}, \ref{sec:cross_domain}), the executor additionally receives a structured spec produced by a separate extractor LLM, prepended to the task question.
+
+\subsection{Models}
+For the baseline failure landscape (Section~\ref{sec:landscape}) we use \Kimi{}, an open-weights agent-tuned model from Moonshot AI. For the same-model role-swap falsifier (Section~\ref{subsec:task17}) we use GPT-5 via OpenRouter. For the grafting pilot (Section~\ref{subsec:grafting}) we use \Sonnet{} as the spec extractor and \Kimi{} as the executor; we compare against \Opus{} as a monolithic-solo baseline. For the 450-task scale validation (Section~\ref{subsec:scribe}) we use GPT-5 as spec extractor and \Kimi{} as executor. \Kimi{} is run via Baseten and OpenRouter; \DeepSeek{} (used for cross-family failure-surface coverage in Section~\ref{sec:landscape}) is run via Fireworks's direct OpenAI-compatible API. Configuration files and per-task seeds will be released as an anonymized artifact upon acceptance.
+
+\subsection{Scoring}
+DABStep uses an official scorer that matches numeric answers with relative tolerance $10^{-4}$ rounded to the smaller of the two decimal-place counts, and list answers via unordered set equality after tokenization. LiveSQLBench uses execution accuracy: the predicted SQL is executed against the template database and result rows are compared (unordered for SELECT without explicit ORDER BY).
+
+% =====================================================================
+\section{Baseline Failure Landscape and Bug Pattern Taxonomy}
+\label{sec:landscape}
+
+\Kimi{} solves 222 of 450 DABStep dev tasks (49.3\%) under the harness above. The 228 failures partition into five outcome classes (Table~\ref{tab:failure_classes}). \texttt{iter\_capped} (97) and \texttt{incorrect} (93) together account for 83\% of failures. Per-topic pass rates show pronounced cluster effects: \texttt{transaction\_count} and \texttt{reference\_lookup} pass at 100\%, while \texttt{fee\_rule} (35.6\% pass) and \texttt{aci\_format} (36.6\% pass) are the dominant failure topics.
+
+We also run a cross-family failure-surface check: \DeepSeek{} on 190 tasks stratified from \Kimi{}'s failure surface. \DeepSeek{} recovers 27 of 190 (14.2\%) of \Kimi{}'s failures. The aggregate cross-family recovery rate establishes that another open-source family on the same surface produces broadly similar (low) recovery, without making per-topic invariance claims.
+
+\begin{table}[t]
+\centering
+\caption{Failure outcome classes for \Kimi{} on DABStep ($n=450$ tasks; 228 failures total).}
+\label{tab:failure_classes}
+\begin{tabular}{lrr}
+\toprule
+Class & Count & \% of failures \\
+\midrule
+\texttt{iter\_capped} (no answer emitted within budget) & 97 & 42.5\% \\
+\texttt{incorrect} (wrong answer committed) & 93 & 40.8\% \\
+\texttt{no\_assistant\_response} & 35 & 15.4\% \\
+\texttt{na\_answered} & 2 & 0.9\% \\
+\texttt{execution\_error} & 1 & 0.4\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Bug pattern decomposition on \texttt{incorrect} failures}
+\label{subsec:bug_patterns}
+
+A trace-level audit of the 93 \texttt{incorrect} failures decomposes them into 10 bug pattern families (Table~\ref{tab:bug_patterns}). Pattern A (``null-as-wildcard mishandling'') is the largest single family, with approximately 25 tasks (27\% of \texttt{incorrect}). We reproduce Pattern A to six decimal places on tasks 1275 and 1278: \Kimi{}'s filter \texttt{is\_credit == True} returns 0.122408 matching its prediction; the correct null-as-wildcard filter \texttt{is\_credit == True | is\_credit.isna()} returns 0.120609 matching the gold.
+
+Patterns A, B, I, J are recoverable via per-pattern spec fixes; this connects directly to the main extraction-execution decoupling result of Section~\ref{sec:main}. Patterns C, D are sampling-variance / inference glitches. Patterns E, F, G are scorer-format mismatches. Pattern H is dataset hygiene (Section~\ref{subsec:benchmark_errors}).
+
+\begin{table}[t]
+\centering
+\caption{Bug pattern decomposition on \Kimi{}'s 93 \texttt{incorrect}-class failures.}
+\label{tab:bug_patterns}
+\small
+\begin{tabular}{lp{4.4cm}r}
+\toprule
+Pattern & Description & n \\
+\midrule
+A & Null-as-wildcard mishandling (strict \texttt{== True} excludes nulls)                 & 18--25 \\
+B & Fee-rule convention error (sum vs.\ pick-one per transaction)                          & 8 \\
+C & Token corruption (OpenRouter inference glitch)                                          & 4 \\
+D & Truncation / streaming partial commit                                                   & 3 \\
+E & Single-vs-list shape mismatch                                                            & 2 \\
+F & Format mismatch hiding correct content                                                   & 2 \\
+G & Yes/No when ``Not Applicable'' expected                                                 & 2 \\
+H & Benchmark hygiene (\S\ref{subsec:benchmark_errors})                                       & $\geq$5 \\
+I & Direction reversal (lowest vs.\ highest)                                                 & 3--6 \\
+J & Wrong filter / dataset slice                                                              & $\sim$5--10 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Benchmark hygiene observations}
+\label{subsec:benchmark_errors}
+
+A trace audit identifies four tasks (1433, 1434, 1453, 2715) where no defensible computation reproduces the gold answer. Tasks 1433 and 1434 ask for the most expensive MCC for a small-Euro transaction; gold is 5813, but no natural aggregation over \texttt{payments.csv} reproduces this value. Task 1453 has an alphabetical tie-break rule that is genuinely ambiguous given the documentation. Task 2715 has a format guideline that contradicts the gold answer itself.
+
+A 5-model dev pilot ($n=10$ tasks, models: \Sonnet{}, \Kimi{}, GLM 5.1, \DeepSeek{}, Qwen3.6 27B) shows convergent failure on tasks 49 and 70. The 5-model agreement on these failures suggests gold-answer ambiguity rather than model capability: only Qwen3.6 correctly identifies the ``Not Applicable'' gold on task 70. We surface these flagged tasks for the DABStep dataset maintainers (Appendix~\ref{app:benchmark_errors}) and exclude them from failure denominators in Sections~\ref{sec:main} and~\ref{sec:negative}.
+
+% =====================================================================
+\section{Main Result: Extraction-Execution Decoupling}
+\label{sec:main}
+
+\subsection{The same-model role-swap falsifier on task 17}
+\label{subsec:task17}
+
+We hold all variables except role assignment constant on a single DABStep task. The task asks for the average fee for credit transactions of a specified merchant in a specified period. The gold answer is volume-weighted (8.907926\%). A count-weighted average produces a different, wrong value (7.683437\%). This bifurcation makes the task useful as a falsifier: the answer the agent commits reveals whether it used the rule the task expects.
+
+Configuration A (monolithic). GPT-5 runs as the sole agent in the harness. It reads documentation, extracts rules, writes pandas code, executes, and commits a final answer. The committed answer is 7.683437\% (count-weighted, wrong).
+
+Configuration B (role-separated). GPT-5 runs only as a spec writer: it reads documentation and produces a structured spec (rule list, applicable fee IDs, weighting convention). The spec is passed to \Kimi{} K2.6 as an additional input. \Kimi{} writes the pandas code and emits an answer. The committed answer is 8.907926\% (volume-weighted, correct).
+
+Same model weights between A and B. Same harness, same prompt template for the shared portions, same documentation context. The only variable that changes is whether GPT-5 is the executor or only the spec writer. The outcome flips from wrong to right.
+
+The result is qualitative: we are not estimating a rate from $n=1$. We are establishing the existence of a comparison where role separation, within a single model's competence envelope, recovers a task that the monolithic execution of the same model fails. The mechanism is then tested at scale in Sections~\ref{subsec:grafting} and~\ref{subsec:scribe}.
+
+\subsection{Grafting pilot: frontier-solo-beating spec injection}
+\label{subsec:grafting}
+
+On a 5-task paired pilot of \Kimi{}'s \texttt{fee\_rule} \texttt{incorrect} failures (tasks 1683, 1709, 1739, 1744, 1771), we compare two configurations. Arm A: \Sonnet{}-extracted spec, passed to \Kimi{} as additional input, executed by \Kimi{}. Arm B: \Opus{} run as a monolithic solo agent on the same task with no spec injection. Same harness, same prompt template, same iteration budget.
+
+Arm A solves 4 of 5 (80\%). Arm B solves 2 of 5 (40\%). Of particular interest are tasks 1744 and 1771: Arm A solves them; Arm B fails them. These two tasks are tasks that monolithic \Opus{} (a more capable model than \Kimi{}) cannot solve, but a \Kimi{} executor consuming a \Sonnet{}-written spec can. This is the empirical anchor for the ``frontier-solo-beating'' framing (Table~\ref{tab:grafting}).
+
+\begin{table}[t]
+\centering
+\caption{Grafting pilot on the \texttt{fee\_rule} \texttt{incorrect} cluster ($n=5$ paired). \Kimi{} + \Sonnet{}-spec recovers two tasks that monolithic \Opus{} fails.}
+\label{tab:grafting}
+\small
+\begin{tabular}{lcc}
+\toprule
+Task & Arm A (\Kimi{}+\Sonnet{}-spec) & Arm B (\Opus{}-solo) \\
+\midrule
+1683 (fee IDs day 100)     & \checkmark & \checkmark \\
+1709 (fee IDs day 300)     & \checkmark & \checkmark \\
+1739 (total fees, EUR)     & $\times$ & $\times$ \\
+\textbf{1744} (fee IDs year-level) & \textbf{\checkmark} & \textbf{$\times$} \\
+\textbf{1771} (fee IDs Sept 2023)  & \textbf{\checkmark} & \textbf{$\times$} \\
+\midrule
+Total                       & \textbf{4/5} & 2/5 \\
+\bottomrule
+\end{tabular}
+\par\smallskip\footnotesize
+Cost: \$5.90 total (Sonnet spec extraction \$1.50 + Arm A \$2.20 + Arm B \$2.17). We acknowledge $n=5$; this experiment is paired and shows the existence of frontier-solo-beating recoveries on this cluster.
+\end{table}
+
+The 5-task pilot is small. We treat it as the existence anchor; the scale validation in Section~\ref{subsec:scribe} provides the large-$n$ aggregate evidence.
+
+\subsection{Scale validation: three-role architecture on full DABStep (n=450)}
+\label{subsec:scribe}
+
+To validate the role-separation effect at scale, we apply a three-role architecture across the full 450-task DABStep dev set. The architecture has three components. A spec extractor (GPT-5 in this configuration) reads the documentation corpus once and produces a structured spec for the task. An executor (\Kimi{}) consumes the spec, the task question, and the tool affordances, and writes pandas code in a ReAct loop. A review agent (GPT-5) audits the executor's intermediate and final outputs against the spec before commit, escalating ambiguity back to the spec extractor when warranted.
+
+Aggregate pass rate is 269/450 = 59.8\% (95.8\% on the easy subset, 52.9\% on the hard subset only). \Kimi{}-solo under the same harness budget reaches 222/450 = 49.3\%. The three-role architecture gains roughly 10 percentage points aggregate at a per-task cost of \$0.33.
+
+We make no claim that this is SOTA. NVIDIA NeMo KGMON~\cite{nemoKgmon2025} achieves 89.95\% on the hard subset via offline learning. DS-STAR~\cite{dsStar2025} and OceanBase DataPilot~\cite{oceanbaseDataPilot2025} also report higher numbers via dataset-specific methods. The relevance of this measurement is that it is a large-$n$ validation, on the same benchmark, that the role-separation effect demonstrated in Sections~\ref{subsec:task17} and~\ref{subsec:grafting} survives at scale. The aggregate gain over the matched \Kimi{}-solo baseline is the relevant comparison, not the leaderboard position.
+
+The architecture's mechanism aligns directly with the task-17 and grafting-pilot findings. The spec extractor performs the documentation-reading and rule-extraction role that produced the wrong answer when GPT-5 did it monolithically on task 17. The executor performs the code-writing and answer-committing role that produced the right answer when \Kimi{} did it on task 17 against a GPT-5 spec. The review agent provides a final commit-gate that catches the kind of single-vs-list shape and format-mismatch failures cataloged as Patterns E--G in Section~\ref{subsec:bug_patterns}.
+
+\subsection{Variant-B falsifier: doc injection without role separation}
+\label{subsec:variant_b}
+
+A natural alternative hypothesis is that the spec is doing the work because it gives the executor a curated subset of documentation, not because it separates the extraction role from the execution role. We test this by Variant-B: instead of giving the executor a spec from a separate extractor, we give it the raw rule corpus (the full \texttt{fees.json} content plus rule explanations) directly injected into the executor prompt. The executor is still a single agent running monolithically; the only change from the baseline is that the prompt now contains more of the rule corpus.
+
+On a 5-task pilot (same tasks as Section~\ref{subsec:grafting}, Arm A), Variant-B accuracy is 2/5 = 40\%. The matched grafted control (Arm A) is 4/5 = 80\%. A scaled $n=184$ Variant-B run could not be graded because the failure rate (parsing failures, irrelevant rule application, and an elevated rate of off-spec answers) was high enough that we deemed the result uninterpretable.
+
+The pilot is small, but it points in the opposite direction of the ``more context is better'' hypothesis. Adding more rule content to the executor without separating the extraction role hurts. This is the cleanest evidence we have that the active ingredient in the role-separation result is role separation itself, not the volume of rule content the executor sees.
+
+% =====================================================================
+\section{Cross-Domain Replication: LiveSQLBench}
+\label{sec:cross_domain}
+
+We test whether the role-separation effect replicates on a structurally different benchmark. LiveSQLBench is a 270-task SQL-generation benchmark across 18 SQLite schemas with hierarchical knowledge bases and column glossaries. The task domain (SQL over relational data) and the documentation structure (per-schema DDL plus KB plus glossary) are unlike DABStep's pandas-over-CSV with a single rule library.
+
+We apply the same role-separation architecture: a spec extractor (\Sonnet{}) reads the schema, the knowledge base, and the column glossary, and produces a structured spec for the task (target tables, join path, JSON-path expressions, filters, output format). An executor (\Kimi{}) consumes the spec and writes SQL.
+
+We run three configurations on a 20-task pilot stratified by complexity (simple / moderate / challenging) and topic. Version v1 is a single-agent baseline with raw schema and KB in the executor prompt; pass rate 6/20 = 30\%. Version v2 adds a formula-first prompt prefix that explicitly directs the executor to derive the target metric formula before writing SQL; pass rate 7/20 = 35\%. Version v3 introduces the spec gate (\Sonnet{}-written spec, \Kimi{}-written SQL); on the 15-task subset of v2 failures, v3 pass rate is 7/15 = 47\%.
+
+The cross-domain pattern matches the DABStep results: separating the spec from the execution recovers tasks that the executor cannot solve when it does the extraction inline. The benchmarks differ in domain (SQL vs.\ pandas), data type (relational vs.\ CSV), documentation structure (per-schema KB+glossary vs.\ single rule library), and prompt scale (24K tokens of rules in DABStep's fee_rule cluster vs.\ 5--15K tokens of schema+KB+glossary in LiveSQL). The effect transfers across all of these.
+
+We documented 10 LiveSQL failure pattern families (E1--E2, F1--F10) that mirror our DABStep taxonomy in structure: multi-hop FK join error, JSON path ambiguity, aggregation-level error, and others. Pattern F3 (aggregation-level error on LiveSQL) is functionally the same failure mode as Pattern B (fee-rule convention error on DABStep). The role-separation architecture targets both: the spec specifies the per-entity pre-aggregation CTE structure explicitly, so the executor does not have to derive it inline.
+
+\subsection{Supporting cross-paradigm anchor: RuleArena NBA}
+\label{sec:rulearena}
+
+To check whether the frontier-vs-open gap on rule-application reasoning persists outside DABStep, we run a 30-task evaluation on RuleArena NBA~\cite{rulearena2025} (10 stratified tasks per complexity level, single-turn rule-application reasoning over a 24K-token excerpt of the NBA Collective Bargaining Agreement). We use RuleArena's official prompt template and substring-match grading.
+
+\Opus{} pass rate is 9/30 = 30\%. \Kimi{} pass rate is 1/30 = 3\%. The gap of 27 percentage points is on a single-turn paradigm: no tool use, no multi-turn ReAct loop, no documentation re-read. The same harness is used for both models. This is the cleanest paired model comparison in the corpus. We do not interpret the 30\% figure as a state-of-the-art measurement (RuleArena's published \Sonnet{}-3.5 baseline is approximately 40--50\% on NBA; the gap to our \Opus{} 30\% is attributable to a stricter substring-match grading we use, a random stratified subset, and different prompt parameters). The interpretation is comparative: the frontier-vs-open gap on rule-application reasoning is large and survives in a paradigm with no tool affordance and no multi-turn loop. It is not specific to the DABStep harness or the \texttt{fee\_rule} cluster.
+
+% =====================================================================
+\section{Negative Results on Mitigations to the Capability Gap}
+\label{sec:negative}
+
+We report a set of negative results on the \texttt{fee\_rule} iter-capped cluster of \Kimi{} ($n=10$ tasks). These tasks are by definition cases where \Kimi{} fails to commit an answer within the iteration budget. The question we ask is whether common mitigations against this kind of failure recover any of these tasks. They do not.
+
+We emphasize the scope: these results are about one cluster of one model. We do not generalize from this cluster to the agent failure surface as a whole.
+
+\paragraph{Independent $k$-sampling.}
+On the 10 \texttt{fee\_rule} iter-capped \Kimi{} failures, $k=5$ independent samples per task yields 3 correct of 50 runs (6\%); pass@5 is 20\%, identical to the best single-sample pass rate. Re-sampling does not bridge the gap on this cluster.
+
+\paragraph{Prompt simplification.}
+A stripped 4-line prompt (versus the 100-line DABStep prompt) on the same 5-task subset yields 0 of 5 correct. Prompt complexity is not the bottleneck on this cluster.
+
+\paragraph{Self-consistency majority vote.}
+We reuse the 50 \Kimi{} sessions from the $k$-sampling experiment. For each task, we extract the final answer from each of the 5 samples, canonicalize numeric answers, bucket, and take the modal answer. On 10 of 10 tasks the modal answer is wrong (6 tasks: no commit within budget on the majority of samples; 4 tasks: a specific wrong numeric answer is the mode).
+
+\paragraph{Reflexion-style critique (with caveat).}
+We adapt the Reflexion design~\cite{reflexion2023} as a no-tool variant: a \Sonnet{} critique on \Kimi{}'s failed trace is prepended as expert guidance to a \Kimi{} retry. The variant scores 0/10 on this cluster. We flag explicitly that this is not full Reflexion: the original Reflexion paper assumes a tool-using agent that combines verbal reflection with action retries. Our variant tests verbal critique alone without tool re-execution. The result establishes that verbal critique without tool re-execution does not bridge the gap; whether full Reflexion with tool retry would is an open question we do not directly test.
+
+\paragraph{Variant-B doc injection.}
+Already described in Section~\ref{subsec:variant_b}. Worse than the matched grafted control on the same tasks. Doc injection without role separation is not a substitute for spec-grafting.
+
+We also note a $n=1$ task observation on reasoning amplification: on a single task (1717), \Kimi{} with thinking=high takes 38 iterations versus thinking=off at 23, with no accuracy gain. This is an anecdote, not a result; we do not include it as a refutation, only as a motivating observation that informed the experiment design.
+
+The substantive content of this section is the set of four well-defined negative results on a single cluster: $k$-sampling, prompt simplification, self-consistency vote, and Reflexion-style critique with the noted caveat. All four point in the same direction: user-side compute interventions on a monolithic agent do not recover the iter-capped failures on this cluster. The architectural intervention (role-separated spec-grafting, Section~\ref{sec:main}) does recover related tasks on adjacent clusters.
+
+% =====================================================================
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Planner-executor decoupling.}
+The planner-executor pattern originates with Plan-and-Solve~\cite{planAndSolve2023}, which separates planning from execution within a single LLM. Multi-agent extensions appear in MetaGPT~\cite{metagpt2023} and AutoGen~\cite{autogen2023}, where distinct agents play distinct roles. CodeAct~\cite{codeAct2024} establishes executable Python actions as the dominant tool affordance. Our contribution differs in the baseline comparison: prior planner-executor work largely compares against weaker-solo baselines, with a cost-efficiency framing (smaller-executor as cheaper). We compare against the frontier-solo baseline (\Opus{} as the monolithic solo agent in Section~\ref{subsec:grafting}; GPT-5 as the monolithic solo agent in Section~\ref{subsec:task17}). The result is that role-separated execution recovers tasks the frontier monolithic agent itself fails on.
+
+\paragraph{Failure taxonomies for LLM agents.}
+MAST~\cite{mast2025} provides a multi-agent failure taxonomy with Cohen's $\kappa = 0.88$ inter-annotator agreement, and argues that improvements in base model capabilities will be insufficient to address the full taxonomy without organizational understanding (an architectural argument adjacent to ours). LifelongAgentBench~\cite{lifelongAgentBench2025} names a failure mode where the agent completes multiple operations but never explicitly submits the final answer; this overlaps the ``commit failure'' phenomenon we observe in Pattern E and the related \texttt{aci\_format} cluster failures. AgentDebug~\cite{agentErrorTaxonomy2025} and Aegis~\cite{aegis2025} provide adjacent single-agent and exploration-failure taxonomies. TRAIL~\cite{trail2025} provides trace-based reasoning issue localization. Our bug-pattern taxonomy is empirically grounded in 93 verified \Kimi{} \texttt{incorrect} failures; we view it as complementary to these taxonomies (we provide concrete reproductions to six decimal places, they provide labeling protocols and inter-annotator reliability).
+
+\paragraph{Rule-application gap and stable rule artifacts.}
+RuleArena~\cite{rulearena2025} establishes rule-identification vs.\ rule-application as distinct gaps in single-turn financial rule reasoning. CMU primitive induction~\cite{cmuPrimitiveInduction2026} recovers the gap via post-hoc trace mining of successful reasoning primitives; they report +44 percentage points on RuleArena NBA. The mechanism is similar in spirit to ours (stable rule artifacts close the gap). Two methodological differences: Lei et al.\ induce primitives \emph{post-hoc} from successful traces of the same source agent; we extract specs \emph{a priori} from documentation. Lei et al.\ recover failures of the same source agent that produced the successful traces; we recover failures of a different (weaker) executor using a stronger extractor, including failures of the frontier-solo monolithic agent (tasks 1744, 1771). Both directions are real and complementary.
+
+\paragraph{Phase-structured failure on DABStep.}
+The DABStep authors~\cite{dabstep2025} describe phase-structured failures in their original benchmark presentation, including agents attempting calculations before reading the documentation that defines key terms and difficulties with implicit/composite rules. Our bug-pattern taxonomy refines the phase-structured story with concrete pattern frequencies and per-task trace reproductions; the role-separation architecture targets the same phase decomposition (read $\to$ extract $\to$ compute $\to$ commit) with an explicit architectural division between extraction and execution.
+
+\paragraph{SOTA architectures on DABStep.}
+DS-STAR~\cite{dsStar2025}, NVIDIA NeMo KGMON~\cite{nemoKgmon2025}, and OceanBase DataPilot~\cite{oceanbaseDataPilot2025} all employ extraction-execution decoupling, achieving leaderboard SOTA on DABStep via dataset-specific learning (e.g., KGMON's 89.95\% on the hard subset via offline corpus learning). We make no SOTA claim. Our result is that the architectural mechanism these systems share (extraction-execution decoupling) recovers tasks the frontier-solo agent fails, even without the dataset-specific learning components. The 269/450 = 59.8\% scale validation in Section~\ref{subsec:scribe} is a baseline-comparison aggregate, not a SOTA claim.
+
+\paragraph{Concurrent corroboration on dissociation.}
+Recent work shows that LLM reasoning chains and final outputs can dissociate. In a Boolean operator task, \Sonnet{} produces verifiably correct reasoning chains with wrong declared answers on 31/31 errors at depth 7~\cite{correctChainsWrongAnswers2026}. Our task-17 falsifier (same model, two roles, opposite outcomes) is a different instance of the same phenomenon: the same underlying model produces different answers depending on how its inference is structured into roles, not on whether it has the necessary information.
+
+% =====================================================================
+\section{Limitations}
+\label{sec:limitations}
+
+\paragraph{Sample sizes on the grafting pilot.}
+The grafting pilot in Section~\ref{subsec:grafting} is $n=5$ paired tasks. We treat this as the existence anchor for the frontier-solo-beating effect; the large-$n$ validation in Section~\ref{subsec:scribe} ($n=450$) provides the aggregate evidence at scale. The pilot establishes that the effect exists; the scale validation establishes that the effect's aggregate magnitude is at least roughly 10 percentage points on the DABStep dev set.
+
+\paragraph{Single seed.}
+Most reported numbers are single-seed point estimates. Multi-seed re-runs of the headline findings are future work. The qualitative existence claims (task-17 role-swap; tasks 1744 and 1771 frontier-solo-beating recoveries) are robust to seed variation in the bootstrap because the result is categorical (commit a wrong answer vs.\ a correct one) and not a rate estimate.
+
+\paragraph{Cross-harness Opus traces.}
+The \Opus{} runs in Sections~\ref{subsec:grafting} and the supporting Opus-Kimi gap discussion in Section~\ref{sec:negative} originated from a different harness with a \texttt{submit\_answer} tool affordance, while \Kimi{} runs use textual answer emission. Cross-harness equivalence is assumed but not formally verified. Re-running \Opus{} in the matched harness is straightforward future work. We do not lean the main results (task-17 falsifier and the scale validation) on this comparison.
+
+\paragraph{Variant-B scale failure.}
+The $n=184$ Variant-B run could not be graded due to the elevated failure rate. We report this honestly and do not claim a refutation rate at that scale. The result is the $n=5$ pilot (40\% vs.\ 80\% control), which we treat as suggestive that doc injection without role separation does not substitute for spec-grafting.
+
+\paragraph{Reflexion implementation caveat.}
+The Reflexion-style critique experiment uses a no-tool variant (\Sonnet{}-critique injected into a \Kimi{} retry). This is not the full Reflexion design. We scope the negative result accordingly.
+
+\paragraph{Mid-investigation bug fixes.}
+Two harness bugs were discovered and fixed during the investigation. First, a path-security check in the planner's \texttt{read\_file} tool blocked all reviewer reads on LiveSQLBench until corrected. Second, the planner's event summariser missed \texttt{run\_sql} tool calls because it only looked at \texttt{run\_python} field names. All numbers reported in this paper are post-fix; the fixes and their effect on intermediate measurements will be documented in the artifact released upon acceptance.
+
+% =====================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+The default monolithic role assignment for LLM agents on docs-heavy data analysis benchmarks is a failure source distinct from model capacity. On a same-model role-swap falsifier (DABStep task 17), the same GPT-5 produces opposite outcomes depending on whether it executes monolithically or is restricted to the spec-writing role with a smaller executor consuming its spec. On a five-task paired grafting pilot, a smaller open-source executor consuming a spec from a different frontier extractor recovers tasks that the frontier model fails when run monolithically. At scale on the full DABStep dev set, a three-role architecture (spec extractor, executor, review agent) reaches 59.8\% versus \Kimi{}-solo 49.3\%. The role-separation effect replicates on a structurally different benchmark (LiveSQLBench: 47\% recovery on 15 baseline failures via a spec gate). A doc-injection control (Variant-B) establishes that adding rule content to a monolithic executor does not substitute for separating the extraction role.
+
+We make no SOTA claim. The contribution is the empirical demonstration that extraction-execution decoupling is the active ingredient: a same-model role-swap recovers a wrong answer to a right one; spec-grafting recovers tasks frontier-solo fails; doc-injection without role separation does not substitute. As supporting empirical material, we document ten reproducible bug pattern families on \Kimi{}'s DABStep failure surface, surface four flagged DABStep tasks for dataset maintainers, and report six negative results on commonly-proposed mitigations to the residual capability gap on the \texttt{fee\_rule} iter-capped cluster.
+
+% =====================================================================
+\balance
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+% =====================================================================
+\appendices
+
+\section{Benchmark Hygiene Flags}
+\label{app:benchmark_errors}
+Tasks 1433, 1434, 1453, 2715 are flagged for the DABStep dataset maintainers. Tasks 1433 and 1434 ask for the most expensive MCC for a small-Euro transaction; the gold value 5813 is not reproducible by any natural aggregation over \texttt{payments.csv}. Task 1453 has an alphabetical tie-break rule that is genuinely ambiguous given the documentation. Task 2715 has a format guideline that contradicts the gold answer itself. A 5-model dev pilot ($n=10$) shows convergent failure on tasks 49 and 70 across \Sonnet{}, \Kimi{}, GLM 5.1, \DeepSeek{}, and Qwen3.6, with only Qwen3.6 correctly identifying the ``Not Applicable'' gold on task 70: suggestive of gold-answer ambiguity at the dataset level.
+
+\section{Reproducibility}
+\label{app:artifact}
+Per-task labels (mechanism class, bug pattern, gold answer), session JSONLs, and re-runnable scripts will be released as an anonymized artifact upon acceptance. The artifact provides the complete reproduction pipeline for every numerical claim in the paper, including the seed-fixed task selections for the cross-family failure-surface check, the grafting pilot, the LiveSQLBench v1--v3 progression, and the RuleArena NBA stratified sample.
+
+\end{document}

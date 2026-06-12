@@ -1,10 +1,11 @@
 # SCRIBE main canonical config — used by scripts/repro.sh and headline numbers.
-# Topology: Kimi-K2.6 ReAct executor on Fireworks; GPT-5 spec+review on OpenRouter.
+# Topology: Kimi-K2.6 ReAct executor on Fireworks2 (faster inference); GPT-5 spec+review on OpenRouter.
+# Uses FIREWORKS_API_KEY2 (secondary key, less loaded).
 # If you only have OPENROUTER_API_KEY (no Fireworks), use kimi_grafted_iterative.yaml
 # which routes Kimi via OpenRouter too.
 
 model:
-  provider: fireworks
+  provider: fireworks2
   model: accounts/fireworks/models/kimi-k2p6
   thinking: null
   prompt_caching: false
@@ -20,7 +21,10 @@ planner:
 
 execution:
   mode: quick
-  max_iterations: 40
+  # Bumped from 40 → 60 (audit FLAG 6, 2026-06-06): pilot v1 had 3 of 10
+  # tasks iter-capped with healthy run_python execution (1738/2564/2761).
+  # Higher cap should give compute-success-commit-failure tasks more headroom.
+  max_iterations: 60
   tool_execution: sequential
   rate_limit_retries: 5
   overloaded_retries: 10

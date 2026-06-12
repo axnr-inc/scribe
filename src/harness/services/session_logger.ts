@@ -18,7 +18,8 @@
  * generating SFT trajectories from logs.
  *
  * Why JSONL: trivially streamable, line-grep'able, and easy to load row-by-row
- * in Python (see `scripts/grade.py`).
+ * in Python (see `scripts/grade.py` for DABStep, `scripts/grade_livesql.py`
+ * for LiveSQLBench, and the KramaBench grader script).
  */
 import * as fs from "fs";
 import * as path from "path";

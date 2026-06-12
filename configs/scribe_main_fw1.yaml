@@ -1,0 +1,33 @@
+# SCRIBE main canonical config (FIREWORKS_API_KEY variant).
+# Identical to scribe_main.yaml except provider: fireworks (uses primary FIREWORKS_API_KEY).
+# Use this AND scribe_main.yaml to shard parallel pilot runs across both API keys.
+
+model:
+  provider: fireworks
+  model: accounts/fireworks/models/kimi-k2p6
+  thinking: null
+  prompt_caching: false
+  temperature: null
+  top_p: null
+  max_tokens: null
+
+prompt_version: dabstep_grafted_iterative
+
+planner:
+  provider: openrouter
+  model: openai/gpt-5
+
+execution:
+  mode: quick
+  max_iterations: 60
+  tool_execution: sequential
+  rate_limit_retries: 5
+  overloaded_retries: 10
+
+connection:
+  dialect: local
+  dataset: ""
+  project_id: ""
+  credential_path: ""
+  context_dir: ""
+  python_bin: python3

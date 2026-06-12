@@ -7,8 +7,9 @@
  * loop can call our tools.
  *
  * `buildToolRegistry([...])` is what `src/run.ts` calls to hand the agent its tools.
- * In scribe the registry is always `[makeRunPythonTool(repl)]` — one tool, the
- * Python REPL. Add more `make<Whatever>Tool` factories here if you want to extend.
+ * The registry composition depends on the benchmark/task: DABStep & Krama get
+ * `run_python`, LiveSQL gets `run_sql`, and when a spec+planner are wired the
+ * registry also includes `ask_planner_agent` and `read_current_spec`.
  *
  * The re-export of `Type` is so tool factories can `import { Type } from "./index.js"`
  * and define their parameter schemas without importing TypeBox directly.

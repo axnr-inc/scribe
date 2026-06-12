@@ -1,0 +1,237 @@
+{
+  "stratified_pass_at_1": 0.7199175824175824,
+  "per_dataset": {
+    "deps_dev_v1": 0.5,
+    "github_repos": 0.5,
+    "music_brainz_20k": 0.9333333333333332,
+    "stockindex": 1.0,
+    "stockmarket": 1.0,
+    "agnews": 0.25,
+    "bookreview": 1.0,
+    "crmarenapro": 0.8461538461538461,
+    "googlelocal": 1.0,
+    "pancancer_atlas": 0.6666666666666666,
+    "yelp": 0.9428571428571428,
+    "patents": 0.0
+  },
+  "n_cells": 270,
+  "n_fail_cells": 63,
+  "qstats": {
+    "deps_dev_v1|1": {
+      "pass": 0,
+      "n": 5
+    },
+    "deps_dev_v1|2": {
+      "pass": 5,
+      "n": 5
+    },
+    "github_repos|1": {
+      "pass": 0,
+      "n": 5
+    },
+    "github_repos|2": {
+      "pass": 0,
+      "n": 5
+    },
+    "github_repos|3": {
+      "pass": 5,
+      "n": 5
+    },
+    "github_repos|4": {
+      "pass": 5,
+      "n": 5
+    },
+    "music_brainz_20k|1": {
+      "pass": 5,
+      "n": 5
+    },
+    "music_brainz_20k|2": {
+      "pass": 5,
+      "n": 5
+    },
+    "music_brainz_20k|3": {
+      "pass": 4,
+      "n": 5
+    },
+    "stockindex|1": {
+      "pass": 5,
+      "n": 5
+    },
+    "stockindex|2": {
+      "pass": 5,
+      "n": 5
+    },
+    "stockindex|3": {
+      "pass": 5,
+      "n": 5
+    },
+    "stockmarket|1": {
+      "pass": 5,
+      "n": 5
+    },
+    "stockmarket|2": {
+      "pass": 5,
+      "n": 5
+    },
+    "stockmarket|3": {
+      "pass": 5,
+      "n": 5
+    },
+    "stockmarket|4": {
+      "pass": 5,
+      "n": 5
+    },
+    "stockmarket|5": {
+      "pass": 5,
+      "n": 5
+    },
+    "agnews|1": {
+      "pass": 5,
+      "n": 5
+    },
+    "agnews|2": {
+      "pass": 0,
+      "n": 5
+    },
+    "agnews|3": {
+      "pass": 0,
+      "n": 5
+    },
+    "agnews|4": {
+      "pass": 0,
+      "n": 5
+    },
+    "bookreview|1": {
+      "pass": 5,
+      "n": 5
+    },
+    "bookreview|2": {
+      "pass": 5,
+      "n": 5
+    },
+    "bookreview|3": {
+      "pass": 5,
+      "n": 5
+    },
+    "crmarenapro|1": {
+      "pass": 5,
+      "n": 5
+    },
+    "crmarenapro|2": {
+      "pass": 0,
+      "n": 5
+    },
+    "crmarenapro|3": {
+      "pass": 5,
+      "n": 5
+    },
+    "crmarenapro|4": {
+      "pass": 5,
+      "n": 5
+    },
+    "crmarenapro|5": {
+      "pass": 5,
+      "n": 5
+    },
+    "crmarenapro|6": {
+      "pass": 5,
+      "n": 5
+    },
+    "crmarenapro|7": {
+      "pass": 5,
+      "n": 5
+    },
+    "crmarenapro|8": {
+      "pass": 5,
+      "n": 5
+    },
+    "crmarenapro|9": {
+      "pass": 5,
+      "n": 5
+    },
+    "crmarenapro|10": {
+      "pass": 5,
+      "n": 5
+    },
+    "crmarenapro|11": {
+      "pass": 5,
+      "n": 5
+    },
+    "crmarenapro|12": {
+      "pass": 5,
+      "n": 5
+    },
+    "crmarenapro|13": {
+      "pass": 0,
+      "n": 5
+    },
+    "googlelocal|1": {
+      "pass": 5,
+      "n": 5
+    },
+    "googlelocal|2": {
+      "pass": 5,
+      "n": 5
+    },
+    "googlelocal|3": {
+      "pass": 5,
+      "n": 5
+    },
+    "googlelocal|4": {
+      "pass": 5,
+      "n": 5
+    },
+    "pancancer_atlas|1": {
+      "pass": 0,
+      "n": 5
+    },
+    "pancancer_atlas|2": {
+      "pass": 5,
+      "n": 5
+    },
+    "pancancer_atlas|3": {
+      "pass": 5,
+      "n": 5
+    },
+    "yelp|1": {
+      "pass": 5,
+      "n": 5
+    },
+    "yelp|2": {
+      "pass": 5,
+      "n": 5
+    },
+    "yelp|3": {
+      "pass": 5,
+      "n": 5
+    },
+    "yelp|4": {
+      "pass": 4,
+      "n": 5
+    },
+    "yelp|5": {
+      "pass": 5,
+      "n": 5
+    },
+    "yelp|6": {
+      "pass": 5,
+      "n": 5
+    },
+    "yelp|7": {
+      "pass": 4,
+      "n": 5
+    },
+    "patents|1": {
+      "pass": 0,
+      "n": 5
+    },
+    "patents|2": {
+      "pass": 0,
+      "n": 5
+    },
+    "patents|3": {
+      "pass": 0,
+      "n": 5
+    }
+  }
+}

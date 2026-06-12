@@ -97,18 +97,23 @@ def main():
         tid = str(t.get("task_id", t.get("id", "")))
         question = t["question"]
         if args.mode == "grafted":
+            # Bug 4 fix: previously this branch appended the rendered spec to
+            # the question. That caused DOUBLE-INJECTION because src/run.ts
+            # now renders + appends the CURRENT spec from disk at runtime
+            # (which is the correct behaviour — disk reflects planner revisions).
+            # Here we only validate that a usable spec exists, so callers get a
+            # clean warning if extraction failed. The actual injection happens
+            # in run.ts via --specs <dir>.
             spec_path = Path(args.specs) / f"{tid}.json"
             if not spec_path.exists():
-                print(f"  WARN: no spec for {tid}, skipping graft on this task")
-                rows.append({**t, "task_id": tid})
-                continue
-            spec = json.loads(spec_path.read_text())
-            if "_error" in spec:
-                print(f"  WARN: spec for {tid} had error, skipping graft")
-                rows.append({**t, "task_id": tid})
-                continue
-            spec_md = render_spec_for_prompt(spec)
-            question = f"{t['question']}\n\n{spec_md}"
+                print(f"  WARN: no spec for {tid}, run.ts will see task only")
+            else:
+                try:
+                    spec = json.loads(spec_path.read_text())
+                    if "_error" in spec:
+                        print(f"  WARN: spec for {tid} had error; run.ts will skip injection")
+                except Exception as e:
+                    print(f"  WARN: spec for {tid} unparseable ({e}); run.ts will skip injection")
         rows.append({
             "task_id": tid,
             "question": question,

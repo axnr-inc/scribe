@@ -1,0 +1,47 @@
+# KramaBench SCRIBE — Opus 4.7 throughout
+# Spec, Executor, Review all run on Anthropic Claude Opus 4.7.
+# Tests whether role separation provides lift at frontier-throughout.
+#
+# Cost ceiling estimate: ~$300 with thinking OFF on executor, ~$920 with thinking xhigh.
+# Our recommendation: thinking off on executor (this file), leave spec/review at default.
+#
+# Opus 4.7 API breaking changes honored:
+# - No `budget_tokens` (removed; would 400)
+# - No `temperature` / `top_p` / `top_k` (removed; would 400)
+# - No assistant-turn prefills (would 400)
+# - Use adaptive thinking via SDK default when enabled
+#
+# Note: the `thinking` field is intentionally omitted so the executor runs
+# without thinking on Opus 4.7. To enable adaptive thinking later, the harness
+# must send `thinking: {type: "adaptive"}` (NOT a string-mapped budget_tokens).
+
+model:
+  provider: anthropic
+  model: claude-opus-4-7
+  prompt_caching: true
+  thinking: "xhigh"     # pi-ai maps "xhigh" → effort: xhigh on Anthropic 4.7
+  temperature: null
+  top_p: null
+  max_tokens: null
+
+prompt_version: krama_grafted
+
+planner:
+  provider: anthropic
+  model: claude-opus-4-7
+  # Note: planner block schema does not accept `thinking` — pi-ai default applies.
+
+execution:
+  mode: quick
+  max_iterations: 40
+  tool_execution: sequential
+  rate_limit_retries: 10
+  overloaded_retries: 10
+
+connection:
+  dialect: local
+  dataset: ""
+  project_id: ""
+  credential_path: ""
+  context_dir: ""
+  python_bin: python3

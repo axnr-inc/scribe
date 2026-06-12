@@ -57,3 +57,17 @@ paper/
 
 # Internal project deliberation, not for public release
 docs/notes/
+
+# Benchmark data lakes (downloaded by scripts/fetch_*_data.py / staged locally)
+data/kramabench/
+data/dataagentbench/
+
+# Run outputs (heavy; key artifacts are kept under submissions/)
+results/
+
+# Local DB copies of benchmark tasks
+*.db
+
+# Third-party reference papers
+2408.07702v2.pdf
+2605.30621v1.pdf

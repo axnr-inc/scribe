@@ -1,0 +1,35 @@
+# KramaBench SCRIBE config — GLM-5.1 on FIREWORKS (5x faster than OpenRouter).
+# Both spec_agent and planner_agent route via Fireworks for low-latency inference.
+# Executor (Kimi-K2.6) stays on Fireworks2 (FW2 key).
+# Note: spec_agent + executor share Fireworks rate limits but the per-call
+# latency win dominates (4.6x → 5x faster overall vs OR routing).
+
+model:
+  provider: fireworks2
+  model: accounts/fireworks/models/kimi-k2p6
+  thinking: null
+  prompt_caching: false
+  temperature: null
+  top_p: null
+  max_tokens: null
+
+prompt_version: krama_grafted
+
+planner:
+  provider: fireworks2
+  model: accounts/fireworks/models/glm-5p1
+
+execution:
+  mode: quick
+  max_iterations: 40
+  tool_execution: sequential
+  rate_limit_retries: 5
+  overloaded_retries: 10
+
+connection:
+  dialect: local
+  dataset: ""
+  project_id: ""
+  credential_path: ""
+  context_dir: ""
+  python_bin: python3

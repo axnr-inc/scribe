@@ -1,3 +1,7 @@
+# LEGACY (pre-P2): baseline variant; does NOT describe verdict handling.
+# May not pair correctly with --specs (run.ts will still wire ask_planner_agent
+# but this prompt won't teach the executor how to react to verdicts). Behaviour
+# unchanged.
 name: dabstep_baseline
 description: Original DABStep prompt — agent reads manual.md and figures everything out itself
 
