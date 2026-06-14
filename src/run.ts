@@ -376,6 +376,17 @@ async function runOneTask(
   task_id: string;
   wall_seconds: number;
   cost_usd: number;
+  // Per-role cost/token attribution (executor vs planner+reviewer) so mixed
+  // stacks (e.g. Kimi executor + Opus planner) can be costed per model.
+  executor_model: string;
+  executor_input_tokens: number;
+  executor_output_tokens: number;
+  executor_cost_usd: number;
+  planner_model: string | null;
+  planner_input_tokens: number;
+  planner_output_tokens: number;
+  planner_cost_usd: number;
+  planner_calls: number;
   final_answer: string;
   tool_calls: number;
   ask_planner_calls: number;
@@ -386,6 +397,9 @@ async function runOneTask(
 }> {
   const taskDir = path.join(outDir, task.task_id);
   fs.mkdirSync(path.join(taskDir, "sessions"), { recursive: true });
+  // Clear any stale planner-cost sidecar from a prior run into this dir so we
+  // don't double-count planner tokens.
+  try { fs.rmSync(path.join(taskDir, "sessions/planner_cost.json")); } catch {}
 
   const preamblePath = path.join(taskDir, "preamble.py");
   fs.writeFileSync(preamblePath, buildPreamble(prompt, task));
@@ -645,10 +659,40 @@ async function runOneTask(
     }
   } catch {}
 
+  // Executor (main agent loop) token + cost breakdown.
+  const execCostBreak = tokenTracker.computeCost();
+  const executorModel = config.model.model;
+
+  // Planner+reviewer cost from the per-task sidecar written by ask_planner.
+  let plannerModel: string | null = null;
+  let plannerIn = 0, plannerOut = 0, plannerCost = 0, plannerCalls = 0;
+  try {
+    const pcPath = path.join(taskDir, "sessions/planner_cost.json");
+    if (fs.existsSync(pcPath)) {
+      const pc = JSON.parse(fs.readFileSync(pcPath, "utf-8"));
+      plannerModel = pc.model ?? (config.planner?.model ?? null);
+      plannerIn = pc.input_tokens ?? 0;
+      plannerOut = pc.output_tokens ?? 0;
+      plannerCalls = pc.calls ?? 0;
+      const pt = new TokenTracker(plannerModel || "claude-opus-4-7");
+      pt.update({ input_tokens: plannerIn, output_tokens: plannerOut });
+      plannerCost = pt.computeCost().total;
+    }
+  } catch {}
+
   return {
     task_id: task.task_id,
     wall_seconds: wallSeconds,
-    cost_usd: cost,
+    cost_usd: cost + plannerCost,
+    executor_model: executorModel,
+    executor_input_tokens: tokenTracker.inputTokens,
+    executor_output_tokens: tokenTracker.outputTokens,
+    executor_cost_usd: execCostBreak.total,
+    planner_model: plannerModel,
+    planner_input_tokens: plannerIn,
+    planner_output_tokens: plannerOut,
+    planner_cost_usd: plannerCost,
+    planner_calls: plannerCalls,
     final_answer: final,
     tool_calls: actualToolCalls,
     ask_planner_calls: askPlannerCalls,
@@ -737,7 +781,7 @@ async function main() {
       const task = queue.shift()!;
       console.log(`[task ${task.task_id}] starting...`);
       const result = await runOneTask(task, config, prompt, outDir, specsDir, runIndex);
-      console.log(`  done in ${result.wall_seconds.toFixed(1)}s, $${result.cost_usd.toFixed(4)}, tc=${result.tool_calls}, ask_planner=${result.ask_planner_calls}, tb=${result.thinking_blocks}, hit_cap=${result.hit_iter_cap}`);
+      console.log(`  done in ${result.wall_seconds.toFixed(1)}s, $${result.cost_usd.toFixed(4)} (exec ${result.executor_model.split("/").pop()} $${result.executor_cost_usd.toFixed(4)} ${result.executor_input_tokens}/${result.executor_output_tokens}tok | planner ${result.planner_model ? result.planner_model.split("/").pop() : "-"} $${result.planner_cost_usd.toFixed(4)} ${result.planner_input_tokens}/${result.planner_output_tokens}tok x${result.planner_calls}), tc=${result.tool_calls}, hit_cap=${result.hit_iter_cap}`);
       await updateSummary(result);
       await runNext();
     }

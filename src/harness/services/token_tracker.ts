@@ -36,13 +36,32 @@ interface ModelPricing {
 }
 
 const PRICING: Record<string, ModelPricing> = {
+  "claude-opus-4-8":   { input: 5,  output: 25, cacheWrite5m: 6.25,  cacheHit: 0.50 },
+  "claude-opus-4-7":   { input: 5,  output: 25, cacheWrite5m: 6.25,  cacheHit: 0.50 },
   "claude-opus-4-6":   { input: 5,  output: 25, cacheWrite5m: 6.25,  cacheHit: 0.50 },
   "claude-opus-4-5":   { input: 5,  output: 25, cacheWrite5m: 6.25,  cacheHit: 0.50 },
+  "claude-fable-5":    { input: 5,  output: 25, cacheWrite5m: 6.25,  cacheHit: 0.50 },
   "claude-sonnet-4-6": { input: 3,  output: 15, cacheWrite5m: 3.75,  cacheHit: 0.30 },
   "claude-sonnet-4-5": { input: 3,  output: 15, cacheWrite5m: 3.75,  cacheHit: 0.30 },
   "claude-sonnet-4":   { input: 3,  output: 15, cacheWrite5m: 3.75,  cacheHit: 0.30 },
   "claude-haiku-4-5":  { input: 1,  output: 5,  cacheWrite5m: 1.25,  cacheHit: 0.10 },
+  // Open-weights via Fireworks / OpenRouter (no prompt caching -> cache prices = input).
+  "kimi-k2p6":         { input: 0.60, output: 2.50, cacheWrite5m: 0.60, cacheHit: 0.60 },
+  "glm-5.1":           { input: 0.60, output: 2.20, cacheWrite5m: 0.60, cacheHit: 0.60 },
+  "deepseek-v3p1":     { input: 0.27, output: 1.00, cacheWrite5m: 0.27, cacheHit: 0.27 },
 };
+
+// Resolve a (possibly provider-prefixed) model id to a pricing row.
+// e.g. "accounts/fireworks/models/kimi-k2p6" -> "kimi-k2p6"; "z-ai/glm-5.1" -> "glm-5.1".
+function resolvePricing(model: string): ModelPricing | undefined {
+  if (PRICING[model]) return PRICING[model];
+  const tail = model.split("/").pop() || model;
+  if (PRICING[tail]) return PRICING[tail];
+  for (const key of Object.keys(PRICING)) {
+    if (model.includes(key)) return PRICING[key];
+  }
+  return undefined;
+}
 
 export interface CostBreakdown {
   input: number;
@@ -101,7 +120,7 @@ export class TokenTracker {
   }
 
   computeCost(): CostBreakdown {
-    const p = PRICING[this._model] || PRICING["claude-sonnet-4-6"];
+    const p = resolvePricing(this._model) || PRICING["claude-sonnet-4-6"];
     const input = (this.uncachedInputTokens / 1_000_000) * p.input;
     const output = (this._output / 1_000_000) * p.output;
     const cacheWrite = (this._cacheCreation / 1_000_000) * p.cacheWrite5m;
@@ -110,7 +129,7 @@ export class TokenTracker {
   }
 
   computeCallCost(usage: Partial<TokenUsage>): number {
-    const p = PRICING[this._model] || PRICING["claude-sonnet-4-6"];
+    const p = resolvePricing(this._model) || PRICING["claude-sonnet-4-6"];
     const uncached = Math.max(0, (usage.input_tokens ?? 0) - (usage.cache_read_input_tokens ?? 0) - (usage.cache_creation_input_tokens ?? 0));
     return (uncached / 1_000_000) * p.input
       + ((usage.output_tokens ?? 0) / 1_000_000) * p.output

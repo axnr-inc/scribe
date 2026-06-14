@@ -851,11 +851,12 @@ async function callPlannerAnthropic(args: {
   max_tokens: number;
   maxToolTurns?: number;
   docsDir?: string;
-}): Promise<{ text: string; finalMessages: any[] }> {
+}): Promise<{ text: string; finalMessages: any[]; usage: { input: number; output: number } }> {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error("ANTHROPIC_API_KEY not set");
   const maxToolTurns = args.maxToolTurns ?? PLANNER_MAX_TOOL_TURNS;
   let messages = [...args.messages];
+  const usage = { input: 0, output: 0 };
 
   const docsDir = args.docsDir ?? CONTEXT_DIR_FOR_PLANNER;
   // EC3: only expose query_fees when the docs dir actually has fees.json.
@@ -884,13 +885,19 @@ async function callPlannerAnthropic(args: {
       throw new Error(`Anthropic ${res.status}: ${errText.slice(0, 500)}`);
     }
     const data = await res.json() as any;
+    if (data?.usage) {
+      usage.input += (data.usage.input_tokens ?? 0)
+        + (data.usage.cache_read_input_tokens ?? 0)
+        + (data.usage.cache_creation_input_tokens ?? 0);
+      usage.output += data.usage.output_tokens ?? 0;
+    }
     const blocks: any[] = data.content || [];
     const toolUses = blocks.filter((b: any) => b.type === "tool_use");
     messages.push({ role: "assistant", content: blocks });
 
     if (toolUses.length === 0) {
       const text = blocks.filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n");
-      return { text, finalMessages: messages };
+      return { text, finalMessages: messages, usage };
     }
 
     const toolResultBlocks: any[] = [];
@@ -920,6 +927,7 @@ async function callPlannerAnthropic(args: {
     text: (lastText ? lastText + "\n\n" : "")
       + `[planner hit tool-turn cap of ${maxToolTurns}; returning partial reply]`,
     finalMessages: messages,
+    usage,
   };
 }
 
@@ -930,11 +938,12 @@ async function callPlannerOpenRouter(args: {
   max_tokens: number;
   maxToolTurns?: number;
   docsDir?: string;
-}): Promise<{ text: string; finalMessages: any[] }> {
+}): Promise<{ text: string; finalMessages: any[]; usage: { input: number; output: number } }> {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error("OPENROUTER_API_KEY not set");
   const maxToolTurns = args.maxToolTurns ?? PLANNER_MAX_TOOL_TURNS;
   const docsDir = args.docsDir ?? CONTEXT_DIR_FOR_PLANNER;
+  const usage = { input: 0, output: 0 };
 
   // OpenRouter uses OpenAI-style tool schema. Convert our planner tools.
   // EC3: gate query_fees on the docs dir containing fees.json.
@@ -984,6 +993,10 @@ async function callPlannerOpenRouter(args: {
       throw new Error(`OpenRouter ${res.status}: ${errText.slice(0, 500)}`);
     }
     const data = await res.json() as any;
+    if (data?.usage) {
+      usage.input += data.usage.prompt_tokens ?? 0;
+      usage.output += data.usage.completion_tokens ?? 0;
+    }
     const msg = data.choices?.[0]?.message;
     if (!msg) throw new Error("OpenRouter: no message in response");
 
@@ -994,7 +1007,7 @@ async function callPlannerOpenRouter(args: {
       const text = msg.content ?? "(no content)";
       // Strip the leading system message back out before returning to caller.
       const finalMessages = openaiMessages.slice(1);
-      return { text, finalMessages };
+      return { text, finalMessages, usage };
     }
     for (const tc of toolCalls) {
       const fname = tc.function?.name;
@@ -1024,6 +1037,7 @@ async function callPlannerOpenRouter(args: {
     text: (lastText ? lastText + "\n\n" : "")
       + `[planner hit tool-turn cap of ${maxToolTurns}; returning partial reply]`,
     finalMessages,
+    usage,
   };
 }
 
@@ -1079,6 +1093,20 @@ function makeTool(toolName: string, cfg: AskPlannerConfig): ToolDefinition {
         return { content: [{ type: "text", text: "Error: empty question to planner." }], details: {} };
       }
 
+      // Per-task planner cost sidecar: written next to the executor session log
+      // (unique per task+trial out dir) so run.ts can attribute planner-role
+      // (Opus) tokens separately from executor (e.g. Kimi) tokens.
+      const plannerCostPath = path.join(path.dirname(cfg.sessionLogPath), "planner_cost.json");
+      const accumPlannerCost = (u: { input: number; output: number }) => {
+        let acc = { model: cfg.planner.model, input_tokens: 0, output_tokens: 0, calls: 0 };
+        try { if (fs.existsSync(plannerCostPath)) acc = JSON.parse(fs.readFileSync(plannerCostPath, "utf-8")); } catch {}
+        acc.model = cfg.planner.model;
+        acc.input_tokens += u.input;
+        acc.output_tokens += u.output;
+        acc.calls += 1;
+        try { fs.writeFileSync(plannerCostPath, JSON.stringify(acc)); } catch {}
+      };
+
       const currentSpec = readCurrentSpec(cfg.specPath);
       const session = loadOrCreatePlannerSession(
         plannerSessionPath,
@@ -1128,6 +1156,7 @@ function makeTool(toolName: string, cfg: AskPlannerConfig): ToolDefinition {
           });
           reply = r.text;
           finalMessages = r.finalMessages;
+          accumPlannerCost(r.usage);
         } else {
           const r = await callPlannerOpenRouter({
             model: cfg.planner.model,
@@ -1138,6 +1167,7 @@ function makeTool(toolName: string, cfg: AskPlannerConfig): ToolDefinition {
           });
           reply = r.text;
           finalMessages = r.finalMessages;
+          accumPlannerCost(r.usage);
         }
 
         // EC4 mitigation: if the verdict header is malformed, retry exactly ONCE
@@ -1165,6 +1195,7 @@ function makeTool(toolName: string, cfg: AskPlannerConfig): ToolDefinition {
               });
               reply = r2.text;
               finalMessages = r2.finalMessages;
+              accumPlannerCost(r2.usage);
             } else {
               const r2 = await callPlannerOpenRouter({
                 model: cfg.planner.model,
@@ -1175,6 +1206,7 @@ function makeTool(toolName: string, cfg: AskPlannerConfig): ToolDefinition {
               });
               reply = r2.text;
               finalMessages = r2.finalMessages;
+              accumPlannerCost(r2.usage);
             }
             const parsed2 = parseVerdict(reply);
             if (parsed2.verdictWasMalformed) {

@@ -1,0 +1,36 @@
+# DAB SCRIBE — ablation: cheap executor, frontier planner/reviewer.
+# Topology: Kimi-K2.6 executor on Fireworks; Opus-4.7 planner+reviewer (anthropic).
+# Specs are the SAME Opus-extracted clean specs used by the 0.7199 submission
+# (results/dab_final_specs), so this isolates exactly ONE variable: the executor.
+#
+# Compare directly against configs/dab_scribe.yaml (Opus on all three roles, 0.7199).
+
+model:
+  provider: fireworks
+  model: accounts/fireworks/models/kimi-k2p6
+  thinking: null
+  prompt_caching: false
+  temperature: null
+  top_p: null
+  max_tokens: null
+
+prompt_version: krama_grafted
+
+planner:
+  provider: anthropic
+  model: claude-opus-4-7
+
+execution:
+  mode: quick
+  max_iterations: 40
+  tool_execution: sequential
+  rate_limit_retries: 5
+  overloaded_retries: 10
+
+connection:
+  dialect: local
+  dataset: ""
+  project_id: ""
+  credential_path: ""
+  context_dir: ""
+  python_bin: python3
