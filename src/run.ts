@@ -38,6 +38,11 @@ import { buildToolRegistry } from "./harness/tools/index.js";
 import { makeAfterToolCallHook } from "./harness/hooks/after_tool.js";
 import { makeOnPayload } from "./harness/hooks/prompt_cache.js";
 import { resolveHarnessModel } from "./model_resolver.js";
+import {
+  LangfuseTaskTracer,
+  langfuseTraceUrl,
+  shutdownLangfuse,
+} from "./harness/services/langfuse_tracer.js";
 import * as yaml from "js-yaml";
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
@@ -52,6 +57,8 @@ interface TaskRow {
   answer?: string;
   db_path?: string;       // LiveSQLBench: absolute path to the task's .sqlite file
   db_name?: string;       // LiveSQLBench: database name (for logging)
+  app_name?: string;      // Sentinel eval: ConnectionService app (e.g. eval_alien)
+  gold_csv_path?: string; // Sentinel eval: path to gold CSV for grading
   // KramaBench: per-task data lake directory; overrides global CONTEXT_DIR in the
   // Python REPL preamble so the executor's run_python sees the right files.
   context_dir?: string;
@@ -200,6 +207,42 @@ function buildPreamble(prompt: PromptConfig, task?: TaskRow): string {
     lines.push("    rows = [dict(r) for r in cur.fetchall()]");
     lines.push("    conn.close()");
     lines.push("    return rows");
+    lines.push("");
+  }
+  // Sentinel eval: remote PostgreSQL (ConnectionService or direct psycopg2).
+  if (task?.app_name && task.app_name.trim().length > 0) {
+    const sentinelSdk = process.env.SENTINEL_SDK_PATH
+      ? path.resolve(process.env.SENTINEL_SDK_PATH)
+      : path.resolve(ROOT, "../sentinel-eval-sdk");
+    const sqlBackend = (process.env.SENTINEL_SQL_BACKEND || "connection_service").toLowerCase();
+    const contextPath = path.join(ROOT, "data", "context");
+    lines.push(`SENTINEL_SDK_PATH = ${JSON.stringify(sentinelSdk)}`);
+    lines.push(`APP_NAME = ${JSON.stringify(task.app_name)}`);
+    lines.push(`SQL_DIALECT = "postgres"`);
+    lines.push(`SENTINEL_SQL_BACKEND = ${JSON.stringify(sqlBackend)}`);
+    lines.push(`SENTINEL_RUN_SQL_MAX_ROWS = int(${JSON.stringify(process.env.SENTINEL_RUN_SQL_MAX_ROWS || "100")})`);
+    lines.push("");
+    lines.push("import sys as _sys");
+    if (sqlBackend === "psycopg2") {
+      lines.push(`_sys.path.insert(0, ${JSON.stringify(contextPath)})`);
+      lines.push("import sentinel_sql as _sentinel_sql");
+      lines.push("");
+      lines.push("def run_sql(sql):");
+      lines.push("    r = _sentinel_sql.execute(APP_NAME, sql, max_rows=SENTINEL_RUN_SQL_MAX_ROWS)");
+      lines.push("    if not r.get('success'):");
+      lines.push("        raise RuntimeError(r.get('message', 'SQL failed'))");
+      lines.push("    return r.get('rows', [])");
+    } else {
+      lines.push(`_sys.path.insert(0, SENTINEL_SDK_PATH)`);
+      lines.push("from sql_executor import EvalSQLExecutor");
+      lines.push("_SENTINEL_EXEC = EvalSQLExecutor()");
+      lines.push("");
+      lines.push("def run_sql(sql):");
+      lines.push("    r = _SENTINEL_EXEC.execute(APP_NAME, sql, max_rows=SENTINEL_RUN_SQL_MAX_ROWS)");
+      lines.push("    if not r.get('success'):");
+      lines.push("        raise RuntimeError(r.get('message', 'SQL failed'))");
+      lines.push("    return r.get('rows', [])");
+    }
     lines.push("");
   }
   // Per-task helper-manifest:
@@ -394,6 +437,8 @@ async function runOneTask(
   iter_count: number;
   hit_iter_cap: boolean;
   error: string | null;
+  langfuse_trace_id: string | null;
+  langfuse_url: string | null;
 }> {
   const taskDir = path.join(outDir, task.task_id);
   fs.mkdirSync(path.join(taskDir, "sessions"), { recursive: true });
@@ -421,6 +466,7 @@ async function runOneTask(
   // steps when shown raw JSON; the rendered "trust these facts, do not
   // re-derive" header keeps it anchored on the spec.
   let specPathForTask: string | null = null;
+  let existingLangfuseTraceId: string | null = null;
   if (specsDir) {
     const candidatePath = path.join(specsDir, `${task.task_id}.json`);
     // Bug 6 fix: detect spec extraction failures up-front. If the spec JSON
@@ -437,6 +483,10 @@ async function runOneTask(
           console.warn(`  ${task.task_id}: spec has _error (${(rawObj as any)._error}); skipping injection`);
         } else if (rawObj && typeof rawObj === "object") {
           specObj = rawObj as Record<string, unknown>;
+          const meta = specObj._meta as Record<string, unknown> | undefined;
+          if (meta && typeof meta.langfuse_trace_id === "string") {
+            existingLangfuseTraceId = meta.langfuse_trace_id;
+          }
         }
       } catch { /* let renderer handle parse failure below */ }
     }
@@ -481,20 +531,30 @@ async function runOneTask(
     }
   }
 
+  const langfuseTracer = LangfuseTaskTracer.start(
+    {
+      task_id: task.task_id,
+      run_out_dir: outDir,
+      executor_model: config.model.model,
+      planner_model: config.planner?.model ?? null,
+    },
+    existingLangfuseTraceId,
+  );
+
   const systemPrompt = buildSystemPrompt(userText, config.execution.mode, prompt, task);
 
   const model = resolveHarnessModel(config);
   const tokenTracker = new TokenTracker(config.model.model);
   const sessionLogger = new SessionLogger(taskDir, "normal", "agent");
 
-  // LiveSQL tasks (task.db_path set) use run_sql (SQL-only interface);
-  // DABStep and KramaBench tasks both use run_python (pandas).
-  // P1 Tier-C: verify_step is wired for run_python paths (DABStep + Krama) where
-  // the executor builds DataFrames in the persistent REPL. LiveSQL's executor
-  // only sees run_sql and has no DataFrames in its REPL view, so verify_step
-  // would be inert there — we skip it.
-  const tools = task.db_path
-    ? [makeRunSqlTool(repl)]
+  // LiveSQL (db_path) and Sentinel eval (app_name) use run_sql; others use run_python.
+  const usesSql = Boolean(
+    (task.db_path && task.db_path.trim().length > 0) ||
+    (task.app_name && task.app_name.trim().length > 0),
+  );
+  const sqlDialect = task.app_name ? "postgres" as const : "sqlite" as const;
+  const tools = usesSql
+    ? [makeRunSqlTool(repl, sqlDialect)]
     : [makeRunPythonTool(repl), makeVerifyStepTool(repl)];
 
   // If config has a planner AND --specs was provided, wire up ask_planner_agent
@@ -522,6 +582,7 @@ async function runOneTask(
       sessionLogPath,
       planner: { provider: config.planner.provider, model: config.planner.model },
       docsDir,
+      langfuseTracer: langfuseTracer ?? undefined,
     }));
     tools.push(makeReadCurrentSpecTool(specPathForTask));
   }
@@ -545,24 +606,69 @@ async function runOneTask(
   let abortedForIter = false;
   let thinkingCount = 0;
   let toolCallCount = 0;
+  let lastExecutorOutput = "";
+
+  function toolNamesFromAssistantContent(content: unknown[]): string[] {
+    const names: string[] = [];
+    for (const part of content) {
+      const p = part as Record<string, unknown>;
+      const t = String(p?.type ?? "");
+      if (t === "tool_use" || t === "tool-call" || t === "toolCall") {
+        const n = String(p.name ?? p.toolName ?? p.tool ?? "");
+        if (n) names.push(n);
+      }
+      // OpenAI-style tool_calls nested on a text block (some providers)
+      if (Array.isArray(p.tool_calls)) {
+        for (const tc of p.tool_calls as Array<Record<string, unknown>>) {
+          const fn = tc.function as Record<string, unknown> | undefined;
+          const n = String(fn?.name ?? tc.name ?? "");
+          if (n) names.push(n);
+        }
+      }
+    }
+    return names;
+  }
 
   agent.subscribe((event) => {
     try {
       if (event.type === "message_end") {
         const msg = (event as any).message;
         if (msg?.role === "assistant" && Array.isArray(msg.content)) {
+          let turnText = "";
+          const toolNames = toolNamesFromAssistantContent(msg.content);
           for (const part of msg.content) {
             if (part?.type === "thinking") {
               thinkingCount++;
               sessionLogger.logAssistantThinking(String(part.thinking || ""));
             }
             if (part?.type === "text") {
-              sessionLogger.logAssistantResponse(String(part.text || ""));
+              const t = String(part.text || "");
+              turnText += t;
+              sessionLogger.logAssistantResponse(t);
             }
-            // Tool-call counting happens post-hoc by reading the session log (see
-            // count_session_events below). pi-ai's content blocks use a non-obvious
-            // type name for tool_use that varies by provider, so we count from the
-            // single source of truth — the SessionLogger's JSONL events.
+          }
+          if (turnText) lastExecutorOutput = turnText;
+
+          if (langfuseTracer) {
+            const u = msg?.usage;
+            const inTok = u
+              ? (u.input ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0)
+              : 0;
+            const outTok = u?.output ?? 0;
+            if (inTok > 0 || outTok > 0) {
+              langfuseTracer.logExecutorGeneration({
+                model: config.model.model,
+                inputTokens: inTok,
+                outputTokens: outTok,
+                outputPreview: turnText || lastExecutorOutput,
+                toolNames: toolNames.length ? toolNames : undefined,
+              });
+            } else if (toolNames.length) {
+              langfuseTracer.logExecutorToolTurn({
+                toolNames,
+                outputPreview: turnText || undefined,
+              });
+            }
           }
         }
         if (msg?.usage) {
@@ -600,14 +706,11 @@ async function runOneTask(
   let final = extractFinalText(agent.state.messages);
 
   // ---------------------------------------------------------------------------
-  // Multi-row gate: if the spec declares `min_rows: N` and the executor's
-  // final answer has fewer than N rows, force a single retry.
-  // Row count heuristic: count tuples in `[(...), (...), ...]`; or count
-  // newlines / pipe-separated lines; or count comma-separated items in a list.
-  // Conservative: pick the MAX of these so we don't over-trigger.
+  // Multi-row gate: DAB/Krama tasks that commit Python list answers. Skip for
+  // SQL workflows (LiveSQL / Sentinel) — they emit FINAL SQL, not row lists.
   // ---------------------------------------------------------------------------
   let multiRowRetry = false;
-  if (specPathForTask) {
+  if (specPathForTask && !usesSql) {
     try {
       const specObj = JSON.parse(fs.readFileSync(specPathForTask, "utf-8"));
       const minRows = specObj.min_rows ?? extractMinRowsFromOutputFormat(specObj.expected_output_format);
@@ -680,6 +783,54 @@ async function runOneTask(
     }
   } catch {}
 
+  // 0-token guard: only hard-fail when the executor truly did nothing, or when
+  // Anthropic Opus 4.7/4.8 with thinking enabled hits the known pi-ai no-op bug.
+  // Other providers may omit usage on intermediate turns — warn instead of error.
+  if (!error && tokenTracker.inputTokens === 0 && tokenTracker.outputTokens === 0) {
+    const hadActivity = iterCount > 0 || actualToolCalls > 0 || final.trim().length > 0;
+    const thinking = config.model.thinking;
+    const isOpusThinking =
+      config.model.provider === "anthropic" &&
+      /opus-4-[78]/.test(config.model.model) &&
+      thinking != null && thinking !== "off";
+    if (!hadActivity) {
+      error = "executor made no progress (0 iterations, 0 tool calls, empty output)";
+    } else if (isOpusThinking) {
+      error =
+        "executor made no API calls (0 tokens) — likely pi-ai sent budget_tokens to Opus 4.7; " +
+        "run npm install to apply pi-ai patch, or set thinking: null in config";
+    } else {
+      console.warn(
+        `  ${task.task_id}: 0 usage tokens reported but executor had activity ` +
+        `(iter=${iterCount}, tools=${actualToolCalls}) — cost may be understated`,
+      );
+    }
+  }
+
+  const langfuseTraceId = langfuseTracer?.traceId ?? null;
+  const langfuseUrl = langfuseTraceId ? langfuseTraceUrl(langfuseTraceId) : null;
+  if (langfuseTracer) {
+    langfuseTracer.finish({
+      status: error ? "error" : "ok",
+      outputPreview: final,
+      metadata: {
+        wall_seconds: wallSeconds,
+        cost_usd: cost + plannerCost,
+        tool_calls: actualToolCalls,
+        planner_calls: plannerCalls,
+        error,
+      },
+    });
+    try {
+      fs.writeFileSync(path.join(taskDir, "langfuse.json"), JSON.stringify({
+        langfuse_trace_id: langfuseTraceId,
+        langfuse_url: langfuseUrl,
+        task_id: task.task_id,
+        run_out_dir: outDir,
+      }, null, 2));
+    } catch {}
+  }
+
   return {
     task_id: task.task_id,
     wall_seconds: wallSeconds,
@@ -700,6 +851,8 @@ async function runOneTask(
     iter_count: iterCount,
     hit_iter_cap: abortedForIter,
     error,
+    langfuse_trace_id: langfuseTraceId,
+    langfuse_url: langfuseUrl,
   };
 }
 
@@ -796,6 +949,11 @@ async function main() {
   await runPool(tasks, workers);
 
   console.log(`\nAll ${tasks.length} tasks complete. Summary: ${summaryPath}`);
+  await shutdownLangfuse();
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch(async (e) => {
+  console.error(e);
+  await shutdownLangfuse();
+  process.exit(1);
+});

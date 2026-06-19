@@ -22,12 +22,15 @@ import type { AgentToolResult } from "@mariozechner/pi-agent-core";
 import type { PythonREPL } from "../services/python_repl.js";
 import type { ToolDefinition } from "./index.js";
 
-export function makeRunSqlTool(repl: PythonREPL): ToolDefinition {
+export function makeRunSqlTool(repl: PythonREPL, dialect: "sqlite" | "postgres" = "sqlite"): ToolDefinition {
+  const dbLabel = dialect === "postgres" ? "PostgreSQL" : "SQLite";
+  const toolOutputCap = Number.parseInt(process.env.RUN_SQL_TOOL_OUTPUT_CAP || "100", 10);
+  const safeToolOutputCap = Number.isFinite(toolOutputCap) ? toolOutputCap : 100;
   return {
     name: "run_sql",
     label: "Run SQL",
     description:
-      "Execute a SQL query against this task's SQLite database. " +
+      `Execute a SQL query against this task's ${dbLabel} database. ` +
       "Returns a JSON array of row objects. " +
       "Use it to: (1) verify intermediate CTE outputs, (2) test joins, " +
       "(3) run your final query and check the result shape. " +
@@ -37,6 +40,7 @@ export function makeRunSqlTool(repl: PythonREPL): ToolDefinition {
     }),
     execute: async (_toolCallId: string, params: any): Promise<AgentToolResult<unknown>> => {
       const sql = (params.sql as string).trim();
+      const sqlglotDialect = dialect;
       // Tier B: pre-flight parse via sqlglot (in the REPL). The REPL is a
       // persistent process so sqlglot stays imported across calls.
       // If sqlglot is not installed, we silently fall through to the executor —
@@ -48,7 +52,7 @@ _p1_sql_report = []
 try:
     import sqlglot as _p1_sqlglot
     try:
-        _p1_sqlglot.parse_one(_p1_sql, read="sqlite")
+        _p1_sqlglot.parse_one(_p1_sql, read="${sqlglotDialect}")
         _p1_parse_ok = True
     except Exception as _p1_e:
         _p1_parse_ok = False
@@ -59,7 +63,18 @@ except ImportError:
 if _p1_parse_ok:
     try:
         _rows = run_sql(_p1_sql)
-        print(_json.dumps(_rows[:100]))  # cap at 100 rows
+        import decimal as _p1_decimal
+        def _p1_json_default(o):
+            if isinstance(o, _p1_decimal.Decimal):
+                return float(o)
+            if hasattr(o, "isoformat"):
+                return o.isoformat()
+            raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+        _p1_cap = ${safeToolOutputCap}
+        _rows_out = _rows if _p1_cap <= 0 else _rows[:_p1_cap]
+        print(_json.dumps(_rows_out, default=_p1_json_default))
+        if _p1_cap > 0 and len(_rows) > _p1_cap:
+            print(f"\\n[run_sql truncated rows: showing {_p1_cap}/{len(_rows)}]")
         if _p1_sql_report:
             print("\\n" + "\\n".join(_p1_sql_report))
     except Exception as _p1_run_e:

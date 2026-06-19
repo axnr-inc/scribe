@@ -1,0 +1,33 @@
+# Sentinel eval SCRIBE — Kimi executor + GPT-5 planner.
+# Requires sentinel-eval-sdk context + ConnectionService credentials in sentinel .env.
+# Set SENTINEL_SDK_PATH in scribe/.env (default: ../sentinel-eval-sdk).
+
+model:
+  provider: fireworks2
+  model: accounts/fireworks/models/kimi-k2p6
+  thinking: null
+  prompt_caching: false
+  temperature: null
+  top_p: null
+  max_tokens: null
+
+prompt_version: sentinel_grafted
+
+planner:
+  provider: openrouter
+  model: openai/gpt-5
+
+execution:
+  mode: quick
+  max_iterations: 50
+  tool_execution: sequential
+  rate_limit_retries: 5
+  overloaded_retries: 10
+
+connection:
+  dialect: local
+  dataset: ""
+  project_id: ""
+  credential_path: ""
+  context_dir: ""
+  python_bin: python3

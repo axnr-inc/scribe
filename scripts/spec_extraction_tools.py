@@ -533,6 +533,173 @@ def make_livesql_dispatcher(docs_dir: Path, db_path: Path) -> ToolExecutor:
     return dispatch
 
 
+def _valid_table_name(table_name: str) -> bool:
+    return bool(table_name) and table_name.replace("_", "").replace(".", "").isalnum()
+
+
+def _get_sentinel_executor(sdk_path: Path):
+    import sys
+    sdk = str(sdk_path.resolve())
+    if sdk not in sys.path:
+        sys.path.insert(0, sdk)
+    from sql_executor import EvalSQLExecutor  # noqa: WPS433
+    return EvalSQLExecutor()
+
+
+def _sentinel_sql_backend() -> str:
+    return os.environ.get("SENTINEL_SQL_BACKEND", "connection_service").strip().lower()
+
+
+def _scribe_context_dir() -> Path:
+    return Path(__file__).resolve().parent.parent / "data" / "context"
+
+
+def execute_sentinel_sample_table(table_name: str, n: int, app_name: str, sdk_path: Path) -> str:
+    if not _valid_table_name(table_name):
+        return f"Error: invalid table_name '{table_name}'. Use a bare identifier."
+    if _sentinel_sql_backend() == "psycopg2":
+        import sys
+        ctx = str(_scribe_context_dir())
+        if ctx not in sys.path:
+            sys.path.insert(0, ctx)
+        from sentinel_sql import sample_table  # noqa: WPS433
+        return sample_table(app_name, table_name, n)
+    safe_n = max(1, min(200, int(n or 10)))
+    try:
+        executor = _get_sentinel_executor(sdk_path)
+        result = executor.execute(app_name, f'SELECT * FROM "{table_name}" LIMIT {safe_n}', max_rows=safe_n)
+        if not result.get("success"):
+            return f"Error sampling {table_name}: {result.get('message', 'query failed')}"
+        rows = result.get("rows", [])
+        return json.dumps({
+            "table": table_name,
+            "limit_applied": safe_n,
+            "row_count": len(rows),
+            "rows": rows,
+        }, indent=2, default=str)
+    except Exception as e:
+        return f"Error sampling {table_name}: {e}"
+
+
+def execute_sentinel_describe_table(table_name: str, app_name: str, sdk_path: Path) -> str:
+    if not _valid_table_name(table_name):
+        return f"Error: invalid table_name '{table_name}'. Use a bare identifier."
+    if _sentinel_sql_backend() == "psycopg2":
+        import sys
+        ctx = str(_scribe_context_dir())
+        if ctx not in sys.path:
+            sys.path.insert(0, ctx)
+        from sentinel_sql import describe_table  # noqa: WPS433
+        return describe_table(app_name, table_name)
+    sql = (
+        "SELECT column_name, data_type, is_nullable "
+        "FROM information_schema.columns "
+        f"WHERE table_schema = 'public' AND lower(table_name) = lower('{table_name}') "
+        "ORDER BY ordinal_position"
+    )
+    try:
+        executor = _get_sentinel_executor(sdk_path)
+        result = executor.execute(app_name, sql, max_rows=500)
+        if not result.get("success"):
+            return f"Error describing {table_name}: {result.get('message', 'query failed')}"
+        rows = result.get("rows", [])
+        if not rows:
+            return f"Error: table '{table_name}' not found or has no columns."
+        cols = [
+            {"name": r.get("column_name"), "type": r.get("data_type"),
+             "nullable": r.get("is_nullable")}
+            for r in rows
+        ]
+        return json.dumps({"table": table_name, "columns": cols}, indent=2)
+    except Exception as e:
+        return f"Error describing {table_name}: {e}"
+
+
+def execute_sentinel_list_tables(app_name: str, sdk_path: Path) -> str:
+    if _sentinel_sql_backend() == "psycopg2":
+        import sys
+        ctx = str(_scribe_context_dir())
+        if ctx not in sys.path:
+            sys.path.insert(0, ctx)
+        from sentinel_sql import list_tables  # noqa: WPS433
+        try:
+            tables = list_tables(app_name)
+            return json.dumps({"app_name": app_name, "tables": tables}, indent=2, default=str)
+        except Exception as e:
+            return f"Error listing tables: {e}"
+    try:
+        executor = _get_sentinel_executor(sdk_path)
+        tables = executor.list_tables(app_name)
+        return json.dumps({"app_name": app_name, "tables": tables}, indent=2, default=str)
+    except Exception as e:
+        return f"Error listing tables: {e}"
+
+
+def make_sentinel_sample_table_tool() -> dict:
+    return {
+        "name": "sample_table",
+        "description": (
+            "Sample rows from a table in this task's PostgreSQL database (Sentinel eval). "
+            "Returns the first n rows as JSON. Use to verify column meanings and value "
+            "distributions BEFORE committing a CTE plan."
+        ),
+        "input_schema": {
+            "type": "object",
+            "required": ["table_name"],
+            "properties": {
+                "table_name": {"type": "string"},
+                "n": {"type": "integer", "description": "Rows to return (default 10; max 200)."},
+            },
+        },
+    }
+
+
+def make_sentinel_describe_table_tool() -> dict:
+    return {
+        "name": "describe_table",
+        "description": (
+            "Return column names + PostgreSQL types for a table via information_schema. "
+            "Use to verify exact column casing and types referenced in your spec."
+        ),
+        "input_schema": {
+            "type": "object",
+            "required": ["table_name"],
+            "properties": {
+                "table_name": {"type": "string"},
+            },
+        },
+    }
+
+
+def make_sentinel_list_tables_tool() -> dict:
+    return {
+        "name": "list_tables",
+        "description": (
+            "List all tables in this task's PostgreSQL database. "
+            "Returns schema, tableName, and tableType for each table."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    }
+
+
+def make_sentinel_dispatcher(docs_dir: Path, app_name: str, sdk_path: Path) -> ToolExecutor:
+    def dispatch(name: str, args: dict) -> str:
+        if name == "read_file":
+            return execute_read_file(str(args.get("filename", "")), docs_dir)
+        if name == "list_files":
+            return execute_list_files(docs_dir)
+        if name == "sample_table":
+            return execute_sentinel_sample_table(
+                str(args.get("table_name", "")), int(args.get("n") or 10), app_name, sdk_path,
+            )
+        if name == "describe_table":
+            return execute_sentinel_describe_table(str(args.get("table_name", "")), app_name, sdk_path)
+        if name == "list_tables":
+            return execute_sentinel_list_tables(app_name, sdk_path)
+        return f"Error: unsupported tool '{name}'."
+    return dispatch
+
+
 def make_krama_dispatcher(context_dir: Path) -> ToolExecutor:
     def dispatch(name: str, args: dict) -> str:
         if name == "read_file":

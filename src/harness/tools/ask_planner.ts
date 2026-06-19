@@ -1059,6 +1059,8 @@ export interface AskPlannerConfig {
   recentEventCount?: number;
   /** Directory the planner's read_file tool is restricted to. Defaults to data/context/ (DABStep). */
   docsDir?: string;
+  /** Optional Langfuse tracer for planner LLM calls (same trace as executor). */
+  langfuseTracer?: import("../services/langfuse_tracer.js").LangfuseTaskTracer;
 }
 
 function makeTool(toolName: string, cfg: AskPlannerConfig): ToolDefinition {
@@ -1157,6 +1159,15 @@ function makeTool(toolName: string, cfg: AskPlannerConfig): ToolDefinition {
           reply = r.text;
           finalMessages = r.finalMessages;
           accumPlannerCost(r.usage);
+          cfg.langfuseTracer?.logPlannerGeneration({
+            model: cfg.planner.model,
+            provider: cfg.planner.provider,
+            inputTokens: r.usage.input,
+            outputTokens: r.usage.output,
+            latencyMs: Date.now() - start,
+            inputPreview: userMessage,
+            outputPreview: reply,
+          });
         } else {
           const r = await callPlannerOpenRouter({
             model: cfg.planner.model,
@@ -1168,6 +1179,15 @@ function makeTool(toolName: string, cfg: AskPlannerConfig): ToolDefinition {
           reply = r.text;
           finalMessages = r.finalMessages;
           accumPlannerCost(r.usage);
+          cfg.langfuseTracer?.logPlannerGeneration({
+            model: cfg.planner.model,
+            provider: cfg.planner.provider,
+            inputTokens: r.usage.input,
+            outputTokens: r.usage.output,
+            latencyMs: Date.now() - start,
+            inputPreview: userMessage,
+            outputPreview: reply,
+          });
         }
 
         // EC4 mitigation: if the verdict header is malformed, retry exactly ONCE

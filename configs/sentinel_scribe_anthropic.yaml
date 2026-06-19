@@ -1,0 +1,32 @@
+# Sentinel eval SCRIBE — Kimi executor + Claude planner (no OpenRouter credits needed).
+# Use when OPENROUTER_API_KEY is out of credits: SENTINEL_CONFIG=configs/sentinel_scribe_anthropic.yaml
+
+model:
+  provider: fireworks2
+  model: accounts/fireworks/models/kimi-k2p6
+  thinking: null
+  prompt_caching: false
+  temperature: null
+  top_p: null
+  max_tokens: null
+
+prompt_version: sentinel_grafted
+
+planner:
+  provider: anthropic
+  model: claude-sonnet-4-6
+
+execution:
+  mode: quick
+  max_iterations: 50
+  tool_execution: sequential
+  rate_limit_retries: 5
+  overloaded_retries: 10
+
+connection:
+  dialect: local
+  dataset: ""
+  project_id: ""
+  credential_path: ""
+  context_dir: ""
+  python_bin: python3

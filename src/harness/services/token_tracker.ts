@@ -49,6 +49,7 @@ const PRICING: Record<string, ModelPricing> = {
   "kimi-k2p6":         { input: 0.60, output: 2.50, cacheWrite5m: 0.60, cacheHit: 0.60 },
   "glm-5.1":           { input: 0.60, output: 2.20, cacheWrite5m: 0.60, cacheHit: 0.60 },
   "deepseek-v3p1":     { input: 0.27, output: 1.00, cacheWrite5m: 0.27, cacheHit: 0.27 },
+  "mercury-2":         { input: 0.25, output: 0.75, cacheWrite5m: 0.25, cacheHit: 0.25 },
 };
 
 // Resolve a (possibly provider-prefixed) model id to a pricing row.
